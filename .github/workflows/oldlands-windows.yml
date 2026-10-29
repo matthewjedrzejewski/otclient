@@ -1,0 +1,73 @@
+name: OldLands Windows client
+
+# Builds only the Windows OpenGL client (otclient_gl_x64.exe) of the OldLands branch.
+# The .exe is uploaded as the "oldlands-windows-opengl" artifact of the run.
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - oldlands
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Compile (Solution OpenGL)
+    runs-on: windows-2025-vs2026
+    env:
+      VCPKG_BINARY_SOURCES: "clear"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    steps:
+      - name: Setup MSBuild.exe
+        uses: microsoft/setup-msbuild@v3
+        with:
+          vs-prerelease: true
+          vs-version: "[18.0,19.0)"
+
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Export GitHub Actions cache environment variables
+        uses: actions/github-script@v9
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Get vcpkg baseline
+        shell: pwsh
+        run: |
+          $json = Get-Content vcpkg.json -Raw | ConvertFrom-Json
+          $vcpkgCommitId = $json.'builtin-baseline'
+          "VCPKG_GIT_COMMIT_ID=$vcpkgCommitId" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ format('{0}/vcpkg', github.workspace) }}
+          vcpkgGitURL: "https://github.com/microsoft/vcpkg.git"
+          vcpkgGitCommitId: ${{ env.VCPKG_GIT_COMMIT_ID }}
+
+      - name: Build project (MSBuild solution)
+        shell: pwsh
+        run: |
+          $vcpkgRoot = Join-Path (Get-Location) "vcpkg"
+          $outDir = Join-Path (Get-Location) "artifacts/OpenGL"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+
+          msbuild.exe vc18/otclient.sln `
+            /m `
+            /p:Configuration=OpenGL `
+            /p:Platform=x64 `
+            /p:VcpkgEnableManifest=true `
+            /p:VcpkgRoot="$vcpkgRoot" `
+            /p:OutDir="$outDir\\" `
+            /p:GITHUB_WORKSPACE="${{ github.workspace }}"
+
+      - name: Upload the client
+        uses: actions/upload-artifact@v7
+        with:
+          name: oldlands-windows-opengl
+          path: artifacts/OpenGL/*.exe
