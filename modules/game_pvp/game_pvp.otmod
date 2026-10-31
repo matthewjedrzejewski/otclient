@@ -1,0 +1,10 @@
+Module
+  name: game_pvp
+  description: PvP - duels, Head Hunters and guild wars (extended opcode 208)
+  author: OTS
+  website: None
+  sandboxed: true
+  dependencies: [ game_interface ]
+  scripts: [ game_pvp ]
+  @onLoad: init()
+  @onUnload: terminate()
