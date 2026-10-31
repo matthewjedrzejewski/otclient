@@ -1,0 +1,417 @@
+PvpRow < Panel
+  height: 36
+  margin-bottom: 2
+  background-color: #00000040
+
+  Label
+    id: text
+    anchors.left: parent.left
+    anchors.top: parent.top
+    anchors.right: btn2.left
+    margin-left: 6
+    margin-top: 3
+    margin-right: 6
+    color: #f0f0f0
+
+  Label
+    id: info
+    anchors.left: parent.left
+    anchors.top: text.bottom
+    anchors.right: btn2.left
+    margin-left: 6
+    margin-top: 2
+    margin-right: 6
+    color: #a0a0a0
+
+  Button
+    id: btn1
+    anchors.right: parent.right
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 4
+    width: 70
+    visible: false
+
+  Button
+    id: btn2
+    anchors.right: btn1.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-right: 4
+    width: 70
+    visible: false
+
+PvpTab < Button
+  width: 110
+  height: 22
+  $on:
+    color: #ffd860
+
+PvpField < TextEdit
+  height: 20
+  margin-left: 4
+
+PvpCaption < Label
+  color: #c0c0c0
+  margin-left: 6
+
+PvpList < ScrollablePanel
+  layout: verticalBox
+
+PvpWindow < MainWindow
+  id: pvpWindow
+  !text: tr('PvP: duels, Head Hunters, guild wars')
+  size: 600 500
+  @onEscape: modules.game_pvp.hide()
+
+  PvpTab
+    id: tabDuels
+    !text: tr('Duels')
+    anchors.top: parent.top
+    anchors.left: parent.left
+    @onClick: modules.game_pvp.selectTab('duels')
+
+  PvpTab
+    id: tabBounties
+    !text: tr('Head Hunters')
+    anchors.top: parent.top
+    anchors.left: tabDuels.right
+    margin-left: 4
+    @onClick: modules.game_pvp.selectTab('bounties')
+
+  PvpTab
+    id: tabWars
+    !text: tr('Guild Wars')
+    anchors.top: parent.top
+    anchors.left: tabBounties.right
+    margin-left: 4
+    @onClick: modules.game_pvp.selectTab('wars')
+
+  Button
+    id: withdrawButton
+    !text: tr('Withdraw')
+    anchors.top: parent.top
+    anchors.right: parent.right
+    width: 70
+    @onClick: modules.game_pvp.withdraw()
+
+  Label
+    id: purse
+    anchors.right: withdrawButton.left
+    anchors.verticalCenter: withdrawButton.verticalCenter
+    anchors.left: tabWars.right
+    margin-right: 6
+    text-align: right
+    color: #ffd860
+
+  HorizontalSeparator
+    id: topSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.top: tabDuels.bottom
+    margin-top: 6
+
+  Panel
+    id: duels
+    anchors.top: topSeparator.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSeparator.top
+    margin-top: 6
+    margin-bottom: 6
+
+    Label
+      id: active
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: surrenderButton.left
+      height: 32
+      text-wrap: true
+      color: #80ff80
+
+    Button
+      id: surrenderButton
+      !text: tr('Surrender')
+      anchors.top: parent.top
+      anchors.right: parent.right
+      width: 80
+      visible: false
+      @onClick: modules.game_pvp.surrenderDuel()
+
+    PvpCaption
+      id: nameCaption
+      !text: tr('Opponent')
+      anchors.top: active.bottom
+      anchors.left: parent.left
+      margin-top: 8
+      margin-left: 0
+    PvpField
+      id: duelName
+      anchors.left: nameCaption.right
+      anchors.verticalCenter: nameCaption.verticalCenter
+      width: 140
+    PvpCaption
+      id: stakeCaption
+      !text: tr('Stake (total)')
+      anchors.left: duelName.right
+      anchors.verticalCenter: nameCaption.verticalCenter
+    PvpField
+      id: duelStake
+      anchors.left: stakeCaption.right
+      anchors.verticalCenter: nameCaption.verticalCenter
+      width: 80
+      text: 5000
+    PvpCaption
+      id: deathsCaption
+      !text: tr('Deaths')
+      anchors.left: duelStake.right
+      anchors.verticalCenter: nameCaption.verticalCenter
+    PvpField
+      id: duelDeaths
+      anchors.left: deathsCaption.right
+      anchors.verticalCenter: nameCaption.verticalCenter
+      width: 30
+      text: 3
+    Button
+      id: challengeButton
+      !text: tr('Challenge')
+      anchors.right: parent.right
+      anchors.verticalCenter: nameCaption.verticalCenter
+      width: 80
+      @onClick: modules.game_pvp.challenge()
+
+    Label
+      id: help
+      anchors.top: duelName.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      height: 30
+      text-wrap: true
+      color: #a0a0a0
+
+    PvpList
+      id: list
+      anchors.top: help.bottom
+      anchors.left: parent.left
+      anchors.right: listScroll.left
+      anchors.bottom: parent.bottom
+      margin-top: 4
+      vertical-scrollbar: listScroll
+
+    VerticalScrollBar
+      id: listScroll
+      anchors.top: help.bottom
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      margin-top: 4
+      step: 24
+      pixels-scroll: true
+
+  Panel
+    id: bounties
+    anchors.top: topSeparator.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSeparator.top
+    margin-top: 6
+    margin-bottom: 6
+    visible: false
+
+    PvpCaption
+      id: targetCaption
+      !text: tr('Target')
+      anchors.top: parent.top
+      anchors.left: parent.left
+      margin-top: 4
+      margin-left: 0
+    PvpField
+      id: bountyName
+      anchors.left: targetCaption.right
+      anchors.verticalCenter: targetCaption.verticalCenter
+      width: 140
+    PvpCaption
+      id: amountCaption
+      !text: tr('Reward')
+      anchors.left: bountyName.right
+      anchors.verticalCenter: targetCaption.verticalCenter
+    PvpField
+      id: bountyAmount
+      anchors.left: amountCaption.right
+      anchors.verticalCenter: targetCaption.verticalCenter
+      width: 80
+      text: 5000
+    ComboBox
+      id: bountyCurrency
+      anchors.left: bountyAmount.right
+      anchors.verticalCenter: targetCaption.verticalCenter
+      margin-left: 4
+      width: 110
+      @onOptionChange: modules.game_pvp.onCurrencyChange()
+    Button
+      id: placeButton
+      !text: tr('Place bounty')
+      anchors.right: parent.right
+      anchors.verticalCenter: targetCaption.verticalCenter
+      width: 90
+      @onClick: modules.game_pvp.placeBounty()
+
+    Label
+      id: help
+      anchors.top: bountyName.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      height: 30
+      text-wrap: true
+      color: #a0a0a0
+
+    PvpList
+      id: list
+      anchors.top: help.bottom
+      anchors.left: parent.left
+      anchors.right: listScroll.left
+      anchors.bottom: recent.top
+      margin-top: 4
+      margin-bottom: 4
+      vertical-scrollbar: listScroll
+
+    VerticalScrollBar
+      id: listScroll
+      anchors.top: help.bottom
+      anchors.bottom: recent.top
+      anchors.right: parent.right
+      margin-top: 4
+      margin-bottom: 4
+      step: 24
+      pixels-scroll: true
+
+    Label
+      id: recent
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.bottom: parent.bottom
+      height: 44
+      text-wrap: true
+      text-align: topLeft
+      color: #c0a060
+
+  Panel
+    id: wars
+    anchors.top: topSeparator.bottom
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: bottomSeparator.top
+    margin-top: 6
+    margin-bottom: 6
+    visible: false
+
+    Label
+      id: guild
+      anchors.top: parent.top
+      anchors.left: parent.left
+      anchors.right: parent.right
+      height: 18
+      color: #ffd860
+
+    PvpCaption
+      id: enemyCaption
+      !text: tr('Guild')
+      anchors.top: guild.bottom
+      anchors.left: parent.left
+      margin-top: 6
+      margin-left: 0
+    PvpField
+      id: warGuild
+      anchors.left: enemyCaption.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+      width: 120
+    PvpCaption
+      id: fragsCaption
+      !text: tr('Frags')
+      anchors.left: warGuild.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+    PvpField
+      id: warFrags
+      anchors.left: fragsCaption.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+      width: 36
+      text: 50
+    PvpCaption
+      id: daysCaption
+      !text: tr('Days')
+      anchors.left: warFrags.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+    PvpField
+      id: warDays
+      anchors.left: daysCaption.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+      width: 28
+      text: 7
+    PvpCaption
+      id: warStakeCaption
+      !text: tr('Stake')
+      anchors.left: warDays.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+    PvpField
+      id: warStake
+      anchors.left: warStakeCaption.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+      width: 70
+      text: 0
+    Button
+      id: declareButton
+      !text: tr('Declare')
+      anchors.right: parent.right
+      anchors.verticalCenter: enemyCaption.verticalCenter
+      width: 70
+      @onClick: modules.game_pvp.declareWar()
+
+    Label
+      id: help
+      anchors.top: warGuild.bottom
+      anchors.left: parent.left
+      anchors.right: parent.right
+      margin-top: 6
+      height: 30
+      text-wrap: true
+      color: #a0a0a0
+
+    PvpList
+      id: list
+      anchors.top: help.bottom
+      anchors.left: parent.left
+      anchors.right: listScroll.left
+      anchors.bottom: parent.bottom
+      margin-top: 4
+      vertical-scrollbar: listScroll
+
+    VerticalScrollBar
+      id: listScroll
+      anchors.top: help.bottom
+      anchors.bottom: parent.bottom
+      anchors.right: parent.right
+      margin-top: 4
+      step: 24
+      pixels-scroll: true
+
+  HorizontalSeparator
+    id: bottomSeparator
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: closeButton.top
+    margin-bottom: 8
+
+  Label
+    id: status
+    anchors.left: parent.left
+    anchors.right: closeButton.left
+    anchors.verticalCenter: closeButton.verticalCenter
+    margin-right: 8
+    color: #ffd860
+
+  Button
+    id: closeButton
+    !text: tr('Close')
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    width: 70
+    @onClick: modules.game_pvp.hide()
