@@ -99,7 +99,7 @@ local function fillDuels()
     list:destroyChildren()
     local r, me, now = state.rules or {}, state.me or '', state.now or os.time()
     local duels = state.duels or {}
-    p:getChildById('help'):setText(tr('Both pay half of the stake. Only kills by your opponent count and they cost you nothing (you wake up in the temple). Level %d+, invitations last %d min, a duel %d h.',
+    p:getChildById('help'):setText(tr('Both pay half of the stake. Only kills by your opponent count. A duel death is a real death and every kill is a frag. Level %d+, invitations last %d min, a duel %d h.',
         r.minLevel or 20, r.inviteMin or 15, math.floor((r.durationMin or 180) / 60)))
     local a = duels.active
     local surrender = p:getChildById('surrenderButton')
@@ -184,7 +184,7 @@ local function fillWars()
     for _, id in ipairs({'warGuild', 'warFrags', 'warDays', 'warStake', 'declareButton'}) do
         p:getChildById(id):setEnabled(leader and true or false)
     end
-    p:getChildById('help'):setText(tr('Leaders declare war (frags %d-%d, up to %d days, stake per guild). Kills between the guilds give no frags; the first guild to the limit takes both stakes. Each guild needs %d members of level %d+.',
+    p:getChildById('help'):setText(tr('Leaders declare war (frags %d-%d, up to %d days, stake per guild). Kills count for the war and are normal frags (red skull, ban); the first guild to the limit takes both stakes. Each guild needs %d members of level %d+.',
         r.warMinFrags or 5, r.warMaxFrags or 500, r.warMaxDays or 14, r.warMinMembers or 3, r.minLevel or 20))
     local myId = type(g) == 'table' and g.id or 0
     local shown = {}
