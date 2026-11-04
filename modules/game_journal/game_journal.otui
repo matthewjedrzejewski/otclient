@@ -1,22 +1,6 @@
-AtlasBar < UIWidget
-  height: 10
-  image-source: /game_journal/images/atlas/bar_bg
-  image-border: 4
-  phantom: true
-
-  UIWidget
-    id: fill
-    anchors.left: parent.left
-    anchors.top: parent.top
-    anchors.bottom: parent.bottom
-    width: 0
-    image-source: /game_journal/images/atlas/bar_places
-    image-border: 4
-    phantom: true
-
 AtlasRegion < UIWidget
-  height: 26
-  margin-top: 3
+  height: 22
+  margin-top: 6
   image-border: 1
   image-source: /game_journal/images/row_off
   $hover:
@@ -26,9 +10,9 @@ AtlasRegion < UIWidget
     id: arrow
     size: 9 9
     anchors.left: parent.left
-    anchors.top: parent.top
+    anchors.bottom: parent.bottom
     margin-left: 3
-    margin-top: 6
+    margin-bottom: 5
     image-source: /game_journal/images/atlas/arrow_closed
     phantom: true
 
@@ -36,9 +20,9 @@ AtlasRegion < UIWidget
     id: name
     anchors.left: arrow.right
     anchors.right: count.left
-    anchors.top: parent.top
-    margin-left: 6
-    margin-top: 3
+    anchors.bottom: parent.bottom
+    margin-left: 5
+    margin-bottom: 1
     font: verdana-11px-antialised
     color: #7a1e12
     text-auto-resize: false
@@ -47,27 +31,25 @@ AtlasRegion < UIWidget
   Label
     id: count
     anchors.right: parent.right
-    anchors.top: parent.top
+    anchors.bottom: parent.bottom
     margin-right: 6
-    margin-top: 3
-    width: 46
+    margin-bottom: 1
+    width: 50
     text-align: right
     font: verdana-11px-antialised-italic
     color: #7a5a3a
     phantom: true
 
-  AtlasBar
-    id: bar
-    anchors.left: name.left
+  UIWidget
+    anchors.left: parent.left
     anchors.right: parent.right
     anchors.bottom: parent.bottom
-    margin-right: 6
-    margin-bottom: 2
-    height: 5
-    image-border: 2
+    height: 1
+    background-color: #a0784a80
+    phantom: true
 
 AtlasPlace < UIWidget
-  height: 21
+  height: 22
   focusable: true
   margin-bottom: 1
   image-border: 1
@@ -79,7 +61,7 @@ AtlasPlace < UIWidget
 
   UIWidget
     id: icon
-    size: 16 16
+    size: 14 14
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     margin-left: 16
@@ -90,7 +72,7 @@ AtlasPlace < UIWidget
     anchors.left: icon.right
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
-    margin-left: 6
+    margin-left: 8
     font: verdana-11px-antialised
     color: #3b2414
     text-auto-resize: false
@@ -102,7 +84,7 @@ AtlasUnknown < UIWidget
 
   UIWidget
     id: icon
-    size: 16 16
+    size: 14 14
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     margin-left: 16
@@ -114,13 +96,13 @@ AtlasUnknown < UIWidget
     anchors.left: icon.right
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
-    margin-left: 6
+    margin-left: 8
     font: verdana-11px-antialised-italic
     color: #9a8064
     phantom: true
 
 AtlasSketch < UIWidget
-  size: 276 156
+  size: 276 152
   phantom: true
 
   UIWidget
@@ -130,9 +112,11 @@ AtlasSketch < UIWidget
     phantom: true
 
   UIWidget
-    anchors.fill: parent
+    id: frame
+    anchors.centerIn: parent
+    size: 270 150
     image-source: /game_journal/images/atlas/frame
-    image-border: 9
+    image-border: 3
     phantom: true
 
 AtlasWhere < UIWidget
@@ -167,7 +151,7 @@ AtlasRank < UIWidget
 
   UIWidget
     id: medal
-    size: 22 22
+    size: 24 24
     anchors.left: parent.left
     anchors.verticalCenter: parent.verticalCenter
     phantom: true
@@ -432,21 +416,19 @@ JournalWindow < UIWindow
     anchors.top: parent.top
     margin-left: 46
     margin-top: 112
-    size: 312 66
-    focusable: false
+    size: 312 56
     image-border: 1
-    image-source: /game_journal/images/row_hover
+    image-source: /game_journal/images/row_off
     visible: false
     $hover:
-      image-source: /game_journal/images/row_on
+      image-source: /game_journal/images/row_hover
 
     UIWidget
       id: atlasMedal
-      size: 48 48
+      size: 44 44
       anchors.left: parent.left
-      anchors.top: parent.top
+      anchors.verticalCenter: parent.verticalCenter
       margin-left: 4
-      margin-top: 2
       phantom: true
 
     Label
@@ -455,7 +437,7 @@ JournalWindow < UIWindow
       anchors.right: parent.right
       anchors.top: parent.top
       margin-left: 8
-      margin-top: 2
+      margin-top: 5
       font: verdana-11px-antialised
       color: #6a1a10
       text-auto-resize: false
@@ -464,49 +446,34 @@ JournalWindow < UIWindow
     Label
       id: atlasPlacesText
       anchors.left: atlasRank.left
+      anchors.right: parent.right
       anchors.top: atlasRank.bottom
-      margin-top: 3
-      width: 118
+      margin-top: 2
       font: verdana-11px-antialised
-      color: #4a2e18
+      color: #3b2414
+      text-auto-resize: false
       phantom: true
-
-    AtlasBar
-      id: atlasPlacesBar
-      anchors.left: atlasPlacesText.right
-      anchors.right: parent.right
-      anchors.verticalCenter: atlasPlacesText.verticalCenter
-      margin-right: 8
-
-    Label
-      id: atlasSecretsText
-      anchors.left: atlasRank.left
-      anchors.top: atlasPlacesText.bottom
-      margin-top: 3
-      width: 118
-      font: verdana-11px-antialised
-      color: #4a2e18
-      phantom: true
-
-    AtlasBar
-      id: atlasSecretsBar
-      anchors.left: atlasSecretsText.right
-      anchors.right: parent.right
-      anchors.verticalCenter: atlasSecretsText.verticalCenter
-      margin-right: 8
 
     Label
       id: atlasNext
-      anchors.left: parent.left
+      anchors.left: atlasRank.left
       anchors.right: parent.right
-      anchors.bottom: parent.bottom
-      margin-left: 4
-      margin-bottom: 1
-      text-align: center
+      anchors.top: atlasPlacesText.bottom
+      margin-top: 2
       font: verdana-11px-antialised-italic
       color: #7a5a3a
       text-auto-resize: false
       phantom: true
+
+  UIWidget
+    id: atlasRule
+    anchors.horizontalCenter: chapterTitle.horizontalCenter
+    anchors.top: atlasSummary.bottom
+    margin-top: 2
+    size: 300 9
+    image-source: /game_journal/images/rule
+    visible: false
+    phantom: true
 
   ScrollablePanel
     id: entries

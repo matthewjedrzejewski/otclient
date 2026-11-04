@@ -206,6 +206,8 @@ end
 
 -- ---------------------------------------------------------------- the Explorers' Atlas
 local KIND_ICON = {land = 'land', under = 'under', high = 'high'}
+-- 'ink': the sketches are pen drawings on the page (no frame); 'map': pieces of the game map in a thin ink frame
+ATLAS_SKETCH = ATLAS_SKETCH or 'ink'
 local expanded = {}       -- land key -> true when its places are shown
 local regionWidgets = {}
 
@@ -229,17 +231,6 @@ local function regionOf(key)
     end
 end
 
-local function setBar(bar, got, total, image)
-    local fill = bar:getChildById('fill')
-    if image then
-        fill:setImageSource('/game_journal/images/atlas/' .. image)
-    end
-    local w = bar:getWidth()
-    local f = total and total > 0 and math.floor(w * math.min(1, (got or 0) / total) + 0.5) or 0
-    fill:setWidth(f)
-    fill:setVisible(f >= 4)
-end
-
 local function rankName(a, i)
     local r = a.ranks and a.ranks[i]
     return r and r.n or ''
@@ -261,6 +252,7 @@ function showPlacePage(e)
     child('pageSeal'):setImageSource('/game_journal/images/atlas/' .. (KIND_ICON[e.k] or 'land') .. '_big')
     local sketch = g_ui.createWidget('AtlasSketch', child('page'))
     sketch:getChildById('map'):setImageSource(mapImage(e.id))
+    sketch:getChildById('frame'):setVisible(ATLAS_SKETCH == 'map')
     if e.w and e.w ~= '' then
         local w = g_ui.createWidget('AtlasWhere', child('page'))
         local label = w:getChildById('text')
@@ -283,7 +275,7 @@ function showSocietyPage()
     local a = atlasInfo()
     local rewarded = a.rewarded or 0
     local earned = a.rank or 0
-    child('pageSeal'):setImageSource('/game_journal/images/atlas/rank' .. math.max(0, math.min(5, rewarded)))
+    child('pageSeal'):setImageSource('/game_journal/images/atlas/society' .. (rewarded > 0 and 1 or 0))
     child('pageTitle'):setText(tr('The Explorer Society'))
     if rewarded > 0 then
         child('pageSub'):setText(tr('You are a %s', rankName(a, rewarded)))
@@ -299,7 +291,7 @@ function showSocietyPage()
     local n = (a.places or 0) + (a.secrets or 0)
     for i, rk in ipairs(a.ranks or {}) do
         local row = g_ui.createWidget('AtlasRank', child('page'))
-        row:getChildById('medal'):setImageSource('/game_journal/images/atlas/rank_s' .. math.min(5, i))
+        row:getChildById('medal'):setImageSource('/game_journal/images/atlas/society_s' .. (i <= earned and 1 or 0))
         row:getChildById('name'):setText(rk.n)
         local info = tr('%d discoveries, %d gold', rk.need or 0, rk.gold or 0)
         local mark = row:getChildById('mark')
@@ -311,7 +303,6 @@ function showSocietyPage()
             row:getChildById('name'):setColor('#8a1a10')
         else
             row:getChildById('name'):setColor('#8a7a66')
-            row:getChildById('medal'):setOpacity(0.45)
             info = info .. ' - ' .. tr('%d to go', math.max(0, (rk.need or 0) - n))
         end
         row:getChildById('info'):setText(info)
@@ -323,31 +314,23 @@ local function atlasSummary()
     local a = atlasInfo()
     local box = child('atlasSummary')
     local rewarded, earned = a.rewarded or 0, a.rank or 0
-    child('atlasMedal'):setImageSource('/game_journal/images/atlas/rank' .. math.max(0, math.min(5, rewarded)))
+    child('atlasMedal'):setImageSource('/game_journal/images/atlas/society' .. (rewarded > 0 and 1 or 0))
     child('atlasRank'):setText(rewarded > 0 and tr('%s of the Explorer Society', rankName(a, rewarded))
         or tr('Not yet known to the Explorer Society'))
-    child('atlasPlacesText'):setText(tr('Places  %d / %d', a.places or 0, a.placesTotal or 0))
-    child('atlasSecretsText'):setText(tr('Passages  %d / %d', a.secrets or 0, a.secretsTotal or 0))
+    child('atlasPlacesText'):setText(tr('%d places and %d secret passages', a.places or 0, a.secrets or 0))
     local nextLine = child('atlasNext')
     local n = (a.places or 0) + (a.secrets or 0)
     if earned > rewarded then
-        nextLine:setText(tr('New rank earned! Report to the Society.'))
+        nextLine:setText(tr('New rank! Report to the Society.'))
         nextLine:setColor('#a01c10')
     elseif a.ranks and a.ranks[earned + 1] then
         local nx = a.ranks[earned + 1]
-        nextLine:setText(tr('%d more discoveries to become %s', math.max(0, (nx.need or 0) - n), nx.n))
+        nextLine:setText(tr('%d more to become %s', math.max(0, (nx.need or 0) - n), nx.n))
         nextLine:setColor('#7a5a3a')
     else
         nextLine:setText(tr('The whole Atlas bows to you.'))
         nextLine:setColor('#7a5a3a')
     end
-    -- bars need their real width: set them once the layout is done
-    scheduleEvent(function()
-        if window and not box:isDestroyed() then
-            setBar(child('atlasPlacesBar'), a.places, a.placesTotal, 'bar_places')
-            setBar(child('atlasSecretsBar'), a.secrets, a.secretsTotal, 'bar_secrets')
-        end
-    end, 20)
     box.onClick = function()
         selected.atlas = 0
         child('entries'):focusChild(nil, ActiveFocusReason)
@@ -358,7 +341,8 @@ end
 local function setListGeometry(atlas)
     local list, scroll = child('entries'), child('entriesScroll')
     child('atlasSummary'):setVisible(atlas)
-    local top, height = atlas and 184 or 118, atlas and 296 or 362
+    child('atlasRule'):setVisible(atlas)
+    local top, height = atlas and 180 or 118, atlas and 300 or 362
     list:setMarginTop(top)
     list:setHeight(height)
     scroll:setMarginTop(top)
@@ -414,12 +398,6 @@ function refreshAtlas()
         w:getChildById('name'):setText(r.r or '')
         w:getChildById('count'):setText(tostring(r.got or 0) .. ' / ' .. tostring(r.total or 0))
         w:getChildById('arrow'):setImageSource('/game_journal/images/atlas/' .. (expanded[r.k] and 'arrow_open' or 'arrow_closed'))
-        local bar = w:getChildById('bar')
-        scheduleEvent(function()
-            if window and not bar:isDestroyed() then
-                setBar(bar, r.got, r.total, 'bar_region')
-            end
-        end, 20)
         local key = r.k
         w.onClick = function() toggleRegion(key) end
         regionWidgets[key] = w
@@ -451,6 +429,7 @@ function refreshAtlas()
     elseif (a.hiddenLands or 0) > 0 then
         local u = g_ui.createWidget('AtlasUnknown', list)
         u:setHeight(34)
+        u:setMarginTop(8)
         local t = u:getChildById('text')
         t:setTextWrap(true)
         t:setText(tr('Beyond your maps: %d more places in lands you have not set foot in.', a.hiddenPlaces or 0))
