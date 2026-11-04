@@ -90,6 +90,48 @@ local function sealIcon(s)
     return '/game_journal/images/seal' .. tostring(math.max(0, math.min(2, tonumber(s) or 0)))
 end
 
+-- ---------------------------------------------------------------- small helpers (04.11.2026)
+-- a list title that fits its row: cut with "..." instead of running under the scrollbar
+local TITLE_WIDTH = 248
+local function fitTitle(label, text)
+    text = text or ''
+    label:setText(text)
+    if label:getTextSize().width <= TITLE_WIDTH then
+        return
+    end
+    local cut = text:gsub('%.+$', '')
+    while #cut > 4 do
+        cut = cut:sub(1, -2):gsub('%s+$', '')
+        label:setText(cut .. '...')
+        if label:getTextSize().width <= TITLE_WIDTH then
+            return
+        end
+    end
+end
+
+-- the books of the Silent Library hold only numbers: name them instead of showing a row of digits
+local numberBooks = 0     -- numbered while the list is built
+local function bookTitle(t, count)
+    if t and t:match('^[%d%s%.]+$') and #t > 8 then
+        if count then
+            numberBooks = numberBooks + 1
+            return tr('Pages of numbers, part %d', numberBooks)
+        end
+        return tr('Pages of numbers')
+    end
+    return t
+end
+
+-- the seal next to the page title; without one the title moves to the left edge of the page
+local function setSeal(path)
+    local seal = child('pageSeal')
+    seal:setImageSource(path or '')
+    local has = path and path ~= ''
+    seal:setWidth(has and 44 or 0)
+    child('pageTitle'):setWidth(has and 252 or 290)
+    child('pageSub'):setWidth(has and 252 or 290)
+end
+
 -- ---------------------------------------------------------------- right page
 local function clearPage()
     if not window then
@@ -99,7 +141,7 @@ local function clearPage()
     child('pageTitle'):setText('')
     child('pageSub'):setText('')
     child('pageStatus'):setText('')
-    child('pageSeal'):setImageSource('')
+    setSeal(nil)
 end
 
 local function addText(text, italic)
@@ -129,7 +171,12 @@ local function showPage(page)
         return
     end
     clearPage()
-    child('pageTitle'):setText(page.title or '')
+    local title = page.title or ''
+    if (page.tab == 'rook' or page.tab == 'library') and bookTitle(title) ~= title then
+        local row = rowsById[page.id]
+        title = row and row:getChildById('title'):getText() or bookTitle(title)
+    end
+    child('pageTitle'):setText(title)
     child('pageSub'):setText(page.sub or '')
     if page.tab == 'seals' then
         local s = page.locked == 1 and 0 or (page.done == 1 and 2 or 1)
@@ -137,12 +184,12 @@ local function showPage(page)
             s = 2
         end
         if page.id == 1 then
-            child('pageSeal'):setImageSource('/game_journal/images/codex_big')
+            setSeal('/game_journal/images/codex_big')
         else
-            child('pageSeal'):setImageSource('/game_journal/images/seal_big' .. s)
+            setSeal('/game_journal/images/seal_big' .. s)
         end
     elseif page.tab == 'chronicle' then
-        child('pageSeal'):setImageSource('/game_journal/images/seal_big1')
+        setSeal('/game_journal/images/seal_big1')
     end
     addText(page.text or '')
     if page.notes and #page.notes > 0 then
@@ -192,7 +239,7 @@ function openEntry(tab, id)
         showPage(cached)
     else
         clearPage()
-        child('pageTitle'):setText(e and e.t or '')
+        child('pageTitle'):setText(e and ((tab == 'rook' or tab == 'library') and bookTitle(e.t) or e.t) or '')
         child('pageSub'):setText(tr('Turning the pages...'))
     end
     local key = tab .. ':' .. tostring(id)
@@ -249,7 +296,7 @@ function showPlacePage(e)
     local r = regionOf(e.r)
     child('pageTitle'):setText(e.t or '')
     child('pageSub'):setText(r and r.r or tr('A place I have seen'))
-    child('pageSeal'):setImageSource('/game_journal/images/atlas/' .. (KIND_ICON[e.k] or 'land') .. '_big')
+    setSeal('/game_journal/images/atlas/' .. (KIND_ICON[e.k] or 'land') .. '_big')
     local sketch = g_ui.createWidget('AtlasSketch', child('page'))
     sketch:getChildById('map'):setImageSource(mapImage(e.id))
     sketch:getChildById('frame'):setVisible(ATLAS_SKETCH == 'map')
@@ -275,7 +322,7 @@ function showSocietyPage()
     local a = atlasInfo()
     local rewarded = a.rewarded or 0
     local earned = a.rank or 0
-    child('pageSeal'):setImageSource('/game_journal/images/atlas/society' .. (rewarded > 0 and 1 or 0))
+    setSeal('/game_journal/images/atlas/society' .. (rewarded > 0 and 1 or 0))
     child('pageTitle'):setText(tr('The Explorer Society'))
     if rewarded > 0 then
         child('pageSub'):setText(tr('You are a %s', rankName(a, rewarded)))
@@ -405,7 +452,7 @@ function refreshAtlas()
             for _, e in ipairs(byRegion[r.k] or {}) do
                 local row = g_ui.createWidget('AtlasPlace', list)
                 row:getChildById('icon'):setImageSource('/game_journal/images/atlas/' .. (KIND_ICON[e.k] or 'land'))
-                row:getChildById('title'):setText(e.t or '')
+                fitTitle(row:getChildById('title'), e.t)
                 local id = e.id
                 row.onFocusChange = function(widget, focused)
                     if focused then
@@ -491,7 +538,7 @@ local function addRow(tab, e)
         icon:setImageSource('/game_journal/images/book_read')
         icon:setSize({width = 14, height = 14})
     end
-    row:getChildById('title'):setText(e.t or '')
+    fitTitle(row:getChildById('title'), (tab == 'rook' or tab == 'library') and bookTitle(e.t, true) or e.t)
     if GROUPED[tab] then
         row:setHeight(22)       -- books sit under their region, sayings under their person: no second line
     else
@@ -533,6 +580,7 @@ function refresh()
     list:destroyChildren()
     rowsById = {}
     shown = {}
+    numberBooks = 0
     setListGeometry(current == 'atlas')
     if current == 'atlas' then
         refreshAtlas()
