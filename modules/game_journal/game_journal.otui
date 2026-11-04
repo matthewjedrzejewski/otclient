@@ -184,17 +184,19 @@ AtlasRank < UIWidget
     phantom: true
 
 JournalRibbon < UIButton
-  size: 96 26
-  image-source: /game_journal/images/ribbon
+  size: 100 30
+  image-source: /game_journal/images/tab
   font: verdana-11px-antialised
-  color: #f0e0c0
+  color: #e6cfa0
   text-align: center
-  text-offset: 0 -3
-  $on:
-    image-source: /game_journal/images/ribbon_on
-    color: #ffffff
+  text-offset: 0 3
   $hover !on:
-    color: #ffffff
+    image-source: /game_journal/images/tab_hover
+    color: #fff0d0
+  $on:
+    image-source: /game_journal/images/tab_on
+    color: #6a1a10
+    text-offset: 0 1
 
 JournalRow < UIWidget
   height: 32
@@ -321,7 +323,7 @@ JournalWindow < UIWindow
     anchors.left: parent.left
     anchors.top: parent.top
     margin-left: 40
-    margin-top: 8
+    margin-top: 4
     !text: tr('Five Seals')
     @onClick: modules.game_journal.selectTab('seals')
 
@@ -329,7 +331,7 @@ JournalWindow < UIWindow
     id: tab_rook
     anchors.left: tab_seals.right
     anchors.top: tab_seals.top
-    margin-left: 6
+    margin-left: 4
     !text: tr('Rookgaard')
     @onClick: modules.game_journal.selectTab('rook')
 
@@ -337,7 +339,7 @@ JournalWindow < UIWindow
     id: tab_library
     anchors.left: tab_rook.right
     anchors.top: tab_seals.top
-    margin-left: 6
+    margin-left: 4
     !text: tr('Library')
     @onClick: modules.game_journal.selectTab('library')
 
@@ -345,7 +347,7 @@ JournalWindow < UIWindow
     id: tab_chronicle
     anchors.left: tab_library.right
     anchors.top: tab_seals.top
-    margin-left: 6
+    margin-left: 4
     !text: tr('Chronicle')
     @onClick: modules.game_journal.selectTab('chronicle')
 
@@ -353,7 +355,7 @@ JournalWindow < UIWindow
     id: tab_atlas
     anchors.left: tab_chronicle.right
     anchors.top: tab_seals.top
-    margin-left: 6
+    margin-left: 4
     !text: tr('Atlas')
     @onClick: modules.game_journal.selectTab('atlas')
 
@@ -361,7 +363,7 @@ JournalWindow < UIWindow
     id: tab_talk
     anchors.left: tab_atlas.right
     anchors.top: tab_seals.top
-    margin-left: 6
+    margin-left: 4
     !text: tr('Hearsay')
     @onClick: modules.game_journal.selectTab('talk')
 
@@ -369,13 +371,13 @@ JournalWindow < UIWindow
     id: closeButton
     anchors.right: parent.right
     anchors.top: parent.top
-    margin-right: 14
-    margin-top: 6
-    size: 22 22
+    margin-right: 24
+    margin-top: 4
+    size: 30 30
     image-source: /game_journal/images/close
-    image-clip: 0 0 22 22
+    image-clip: 0 0 30 30
     $hover:
-      image-clip: 22 0 22 22
+      image-clip: 30 0 30 30
     @onClick: modules.game_journal.hide()
 
   Label
