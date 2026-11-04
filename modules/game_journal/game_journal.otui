@@ -1,0 +1,344 @@
+JournalRibbon < UIButton
+  size: 96 26
+  image-source: /game_journal/images/ribbon
+  font: verdana-11px-antialised
+  color: #f0e0c0
+  text-align: center
+  text-offset: 0 -3
+  $on:
+    image-source: /game_journal/images/ribbon_on
+    color: #ffffff
+  $hover !on:
+    color: #ffffff
+
+JournalRow < UIWidget
+  height: 32
+  focusable: true
+  margin-bottom: 1
+  image-border: 1
+  $hover:
+    image-source: /game_journal/images/row_hover
+  $focus:
+    image-source: /game_journal/images/row_on
+
+  UIWidget
+    id: icon
+    size: 24 24
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    margin-left: 4
+    phantom: true
+
+  Label
+    id: title
+    anchors.left: icon.right
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-left: 8
+    margin-top: 2
+    font: verdana-11px-antialised
+    color: #3b2414
+    text-auto-resize: false
+    phantom: true
+
+  Label
+    id: sub
+    anchors.left: title.left
+    anchors.right: parent.right
+    anchors.top: title.bottom
+    margin-top: 1
+    font: verdana-11px-antialised-italic
+    color: #7a5a3a
+    phantom: true
+
+JournalRegion < UIWidget
+  height: 22
+  margin-top: 6
+  phantom: true
+
+  Label
+    id: name
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    margin-left: 4
+    font: verdana-11px-antialised
+    color: #7a1e12
+    phantom: true
+
+  Label
+    id: count
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    margin-right: 6
+    font: verdana-11px-antialised-italic
+    color: #7a5a3a
+    phantom: true
+
+  UIWidget
+    anchors.left: parent.left
+    anchors.right: parent.right
+    anchors.bottom: parent.bottom
+    height: 1
+    background-color: #a0784a80
+    phantom: true
+
+JournalText < Label
+  font: verdana-11px-antialised
+  color: #3b2414
+  text-wrap: true
+  text-auto-resize: true
+  text-align: topLeft
+  phantom: true
+
+JournalNote < UIWidget
+  phantom: true
+  height: 20
+  margin-top: 6
+
+  UIWidget
+    id: mark
+    size: 14 14
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-top: 1
+    phantom: true
+
+  Label
+    id: text
+    anchors.left: mark.right
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-left: 6
+    font: verdana-11px-antialised-italic
+    color: #4a2e18
+    text-wrap: true
+    text-auto-resize: true
+    text-align: topLeft
+    phantom: true
+
+JournalWindow < UIWindow
+  id: journalWindow
+  size: 760 532
+  anchors.centerIn: parent
+  @onEscape: modules.game_journal.hide()
+
+  UIWidget
+    id: book
+    anchors.left: parent.left
+    anchors.bottom: parent.bottom
+    size: 760 500
+    image-source: /game_journal/images/book
+    phantom: true
+
+  JournalRibbon
+    id: tab_seals
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 40
+    margin-top: 8
+    !text: tr('Five Seals')
+    @onClick: modules.game_journal.selectTab('seals')
+
+  JournalRibbon
+    id: tab_rook
+    anchors.left: tab_seals.right
+    anchors.top: tab_seals.top
+    margin-left: 6
+    !text: tr('Rookgaard')
+    @onClick: modules.game_journal.selectTab('rook')
+
+  JournalRibbon
+    id: tab_library
+    anchors.left: tab_rook.right
+    anchors.top: tab_seals.top
+    margin-left: 6
+    !text: tr('Library')
+    @onClick: modules.game_journal.selectTab('library')
+
+  JournalRibbon
+    id: tab_chronicle
+    anchors.left: tab_library.right
+    anchors.top: tab_seals.top
+    margin-left: 6
+    !text: tr('Chronicle')
+    @onClick: modules.game_journal.selectTab('chronicle')
+
+  JournalRibbon
+    id: tab_atlas
+    anchors.left: tab_chronicle.right
+    anchors.top: tab_seals.top
+    margin-left: 6
+    !text: tr('Atlas')
+    @onClick: modules.game_journal.selectTab('atlas')
+
+  JournalRibbon
+    id: tab_talk
+    anchors.left: tab_atlas.right
+    anchors.top: tab_seals.top
+    margin-left: 6
+    !text: tr('Hearsay')
+    @onClick: modules.game_journal.selectTab('talk')
+
+  UIButton
+    id: closeButton
+    anchors.right: parent.right
+    anchors.top: parent.top
+    margin-right: 14
+    margin-top: 6
+    size: 22 22
+    image-source: /game_journal/images/close
+    image-clip: 0 0 22 22
+    $hover:
+      image-clip: 22 0 22 22
+    @onClick: modules.game_journal.hide()
+
+  Label
+    id: chapterTitle
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 50
+    margin-top: 66
+    width: 310
+    font: sans-bold-16px
+    color: #6a1a10
+    text-align: center
+    phantom: true
+
+  Label
+    id: chapterSub
+    anchors.left: chapterTitle.left
+    anchors.top: chapterTitle.bottom
+    width: 310
+    margin-top: 2
+    font: verdana-11px-antialised-italic
+    color: #7a5a3a
+    text-align: center
+    phantom: true
+
+  UIWidget
+    id: chapterRule
+    anchors.horizontalCenter: chapterTitle.horizontalCenter
+    anchors.top: chapterSub.bottom
+    margin-top: 4
+    size: 300 9
+    image-source: /game_journal/images/rule
+    phantom: true
+
+  ScrollablePanel
+    id: entries
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 50
+    margin-top: 118
+    size: 300 362
+    layout:
+      type: verticalBox
+    vertical-scrollbar: entriesScroll
+
+  SmallScrollBar
+    id: entriesScroll
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 354
+    margin-top: 118
+    height: 362
+
+  UIWidget
+    id: pageSeal
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 412
+    margin-top: 60
+    size: 44 44
+    phantom: true
+
+  Label
+    id: pageTitle
+    anchors.left: pageSeal.right
+    anchors.top: parent.top
+    margin-left: 8
+    margin-top: 64
+    width: 252
+    font: sans-bold-16px
+    color: #6a1a10
+    text-wrap: true
+    text-auto-resize: true
+    phantom: true
+
+  Label
+    id: pageSub
+    anchors.left: pageTitle.left
+    anchors.top: pageTitle.bottom
+    width: 252
+    margin-top: 2
+    font: verdana-11px-antialised-italic
+    color: #7a5a3a
+    phantom: true
+
+  UIWidget
+    id: pageRule
+    anchors.left: parent.left
+    anchors.top: pageSub.bottom
+    margin-left: 410
+    margin-top: 4
+    size: 300 9
+    image-source: /game_journal/images/rule
+    phantom: true
+
+  ScrollablePanel
+    id: page
+    anchors.left: parent.left
+    anchors.top: pageRule.bottom
+    anchors.bottom: parent.bottom
+    margin-left: 418
+    margin-top: 6
+    margin-bottom: 90
+    width: 282
+    layout:
+      type: verticalBox
+    vertical-scrollbar: pageScroll
+
+  SmallScrollBar
+    id: pageScroll
+    anchors.left: parent.left
+    anchors.top: pageRule.bottom
+    anchors.bottom: parent.bottom
+    margin-left: 704
+    margin-top: 6
+    margin-bottom: 90
+
+  Label
+    id: pageStatus
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 418
+    margin-top: 452
+    width: 220
+    font: verdana-11px-antialised
+    color: #6a1a10
+    phantom: true
+
+  UIButton
+    id: prevButton
+    anchors.left: parent.left
+    anchors.top: parent.top
+    margin-left: 640
+    margin-top: 448
+    size: 30 22
+    image-source: /game_journal/images/prev
+    image-clip: 0 0 30 22
+    $hover:
+      image-clip: 30 0 30 22
+    @onClick: modules.game_journal.step(-1)
+
+  UIButton
+    id: nextButton
+    anchors.left: prevButton.right
+    anchors.top: prevButton.top
+    margin-left: 2
+    size: 30 22
+    image-source: /game_journal/images/next
+    image-clip: 0 0 30 22
+    $hover:
+      image-clip: 30 0 30 22
+    @onClick: modules.game_journal.step(1)

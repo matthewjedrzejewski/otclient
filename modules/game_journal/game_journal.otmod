@@ -1,0 +1,10 @@
+Module
+  name: game_journal
+  description: The Book of the Five Seals - the journal (extended opcode 209)
+  author: OTS
+  website: None
+  sandboxed: true
+  dependencies: [ game_interface ]
+  scripts: [ game_journal ]
+  @onLoad: init()
+  @onUnload: terminate()
