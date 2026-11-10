@@ -21,6 +21,7 @@ local state = {seals = 0, broken = 0, tabs = {}}
 local lists = {}          -- tab -> {entries, regions}
 local building = {}       -- tab -> entries being received in parts
 local current = 'seals'
+local pickedTab = false   -- the player chose a chapter himself in this session
 local selected = {}       -- tab -> id
 local pages = {}          -- 'tab:id' -> page
 local rowsById = {}
@@ -354,6 +355,16 @@ function showSocietyPage()
         end
         row:getChildById('info'):setText(info)
     end
+    if a.book then
+        local own
+        if a.book.have == 1 then
+            own = addText(tr('The Society has bound your own Atlas and signed it with your name. It is bound only once.'))
+        else
+            own = addText(tr('For %d discoveries the Society binds your own Atlas and signs it with your name. %d to go.',
+                a.book.need or 0, math.max(0, (a.book.need or 0) - n)))
+        end
+        own:setMarginTop(8)
+    end
     child('pageStatus'):setText(tr('%d discoveries so far', n))
 end
 
@@ -632,6 +643,7 @@ end
 
 function selectTab(k)
     current = k
+    pickedTab = true
     refresh()
 end
 
@@ -670,6 +682,14 @@ function onExtendedOpcode(protocol, opcode, buffer)
         if data.tabs then
             state.tabs = data.tabs
         end
+        -- without the Codex the seals chapter is blank: the book opens on the Atlas, which every character
+        -- fills from the first step (also on Rookgaard)
+        if not pickedTab and state.seals ~= 1 and current == 'seals' then
+            current = data.start or 'atlas'
+            if window then
+                refresh()
+            end
+        end
         if button then
             button:setVisible(true)
         end
@@ -701,6 +721,11 @@ function onExtendedOpcode(protocol, opcode, buffer)
         pages = {}
         current = 'seals'
         selected.seals = 1
+        show(true)
+    elseif data.a == 'show' then
+        -- the signed Explorers' Atlas was used: the book opens on that chapter
+        current = data.tab or 'atlas'
+        pickedTab = true
         show(true)
     elseif data.a == 'new' then
         pages = {}
@@ -794,6 +819,7 @@ local function onGameStart()
     lists, building, pages, selected = {}, {}, {}, {}
     expanded = {}
     current = 'seals'
+    pickedTab = false
     addButton()
     -- tell the server the journal window is here (it then opens the book when a Codex is used)
     scheduleEvent(function() send({a = 'hello'}, true) end, 1500)
