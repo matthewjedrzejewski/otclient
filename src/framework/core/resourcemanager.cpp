@@ -1189,24 +1189,48 @@ void ResourceManager::updateExecutable(std::string fileName)
     if (!dFile)
         g_logger.fatal("Cannot find executable: {} in downloads", fileName);
 
-    const auto& oldWriteDir = getWriteDir();
-    setWriteDir(getWorkDir());
+    // OldLands: the new binary takes the place of the running one under the SAME name, so desktop shortcuts keep
+    // working. Windows cannot overwrite a running exe but can rename it: the running exe becomes <name>.old.exe
+    // (removed on the next start by launchCorrect), the new one is written as <name>.exe and g_app.restart() starts it.
     const std::filesystem::path path(m_binaryPath);
-    const auto newBinary = path.stem().string() + "-" + std::to_string(time(nullptr)) + path.extension().string();
-    g_logger.info("Updating binary file: {}", newBinary);
-    PHYSFS_file* file = PHYSFS_openWrite(newBinary.c_str());
-    if (!file) {
-        return g_logger.fatal(
-            "Can't open {} for writing: {}",
-            newBinary,
-            PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode())
-        );
+    const auto stem = path.stem().string();
+    const auto ext = path.extension().string();
+    auto tmpPath = path;
+    tmpPath.replace_filename(stem + ".update" + ext);
+    auto oldPath = path;
+    oldPath.replace_filename(stem + ".old" + ext);
+
+    std::error_code ec;
+    {
+        std::ofstream out(tmpPath, std::ios::binary | std::ios::trunc);
+        out.write(dFile->response.data(), static_cast<std::streamsize>(dFile->response.size()));
+        out.close();
+        if (!out) {
+            std::filesystem::remove(tmpPath, ec);
+            return g_logger.fatal("Can't write the new client executable: {}", tmpPath.string());
+        }
     }
 
-    PHYSFS_writeBytes(file, dFile->response.data(), dFile->response.size());
-    PHYSFS_close(file);
-    setWriteDir(oldWriteDir);
+    std::filesystem::remove(oldPath, ec);
+    ec.clear();
+    std::filesystem::rename(path, oldPath, ec);
+    if (!ec) {
+        std::filesystem::rename(tmpPath, path, ec);
+        if (!ec) {
+            g_logger.info("Updated binary file: {}", path.string());
+            return;
+        }
+        std::error_code back;
+        std::filesystem::rename(oldPath, path, back); // put the running one back
+    }
 
+    // fallback (folder does not allow renaming): the old way, <name>-<time>.exe, picked by launchCorrect
+    const auto newBinary = path.parent_path() / (stem + "-" + std::to_string(time(nullptr)) + ext);
+    g_logger.info("Updating binary file: {}", newBinary.string());
+    ec.clear();
+    std::filesystem::rename(tmpPath, newBinary, ec);
+    if (ec)
+        g_logger.fatal("Can't save the new client executable {}: {}", newBinary.string(), ec.message());
 #endif
 }
 
@@ -1224,6 +1248,14 @@ bool ResourceManager::launchCorrect(const std::vector<std::string>& args) { // c
     };
 
     auto fileName2 = normalizeName(m_binaryPath.stem().string());
+
+    { // OldLands: the binary replaced by the updater (see updateExecutable) is removed once it has exited
+        auto oldPath = m_binaryPath;
+        oldPath.replace_filename(m_binaryPath.stem().string() + ".old" + m_binaryPath.extension().string());
+        std::error_code oldEc;
+        if (std::filesystem::exists(oldPath, oldEc))
+            std::filesystem::remove(oldPath, oldEc);
+    }
 
     const std::filesystem::path path(m_binaryPath.parent_path());
     std::error_code ec;

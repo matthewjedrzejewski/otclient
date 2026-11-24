@@ -22,6 +22,11 @@ local function loadModules()
   end
 end
 
+-- OldLands: file names may have spaces ("data/fonts/ttf/28 Days Later.ttf"): the URL needs them encoded
+local function encodeUrlPath(path)
+  return (path:gsub("[^%w%-%._~/]", function(c) return string.format("%%%02X", string.byte(c)) end))
+end
+
 local function downloadFiles(url, files, index, retries, doneCallback)
   if not updaterWindow then return end
   local entry = files[index]
@@ -39,7 +44,7 @@ local function downloadFiles(url, files, index, retries, doneCallback)
   updaterWindow.downloadProgress:setPercent(0)
   updaterWindow.mainProgress:setPercent(math.floor(100 * index / #files))
 
-  httpOperationId = HTTP.download(url .. file, file,
+  httpOperationId = HTTP.download(url .. encodeUrlPath(file), file,
     function(file, checksum, err)
       if not err and checksum ~= file_checksum then
         err = "Invalid checksum of: " .. file .. ".\nShould be " .. file_checksum .. ", is: " .. checksum
@@ -66,7 +71,7 @@ local function updateFiles(data, keepCurrentFiles)
   if not updaterWindow then return end
 
   if type(data) ~= "table" then
-    return Updater.error("Invalid data from updater api (not table)")
+    return Updater.skip("invalid data from the updater api (not a table)")
   end
 
   if type(data.error) == 'string' and data.error:len() > 0 then
@@ -207,7 +212,7 @@ function Updater.check(args)
   local function progressUpdater(value)
     removeEvent(scheduledEvent)
     if value == 100 then
-      return Updater.error(tr("Timeout"))
+      return Updater.skip("timeout")
     end
     if updateData and (value > 60 or (not g_platform.isMobile() or not ALLOW_CUSTOM_SERVERS or not loadModulesFunc)) then -- gives 3s to set custom updater for mobile version
       return updateFiles(updateData)
@@ -225,10 +230,20 @@ function Updater.check(args)
     args = args or {}
   }, function(data, err)
     if err then
-      return Updater.error(err)
+      return Updater.skip(err)
     end
     updateData = data
   end)
+end
+
+-- OldLands: the update server could not be asked (website down, no internet, Cloudflare check): the game still
+-- starts with the files the player has, the next start tries again. Errors while downloading still show a box.
+function Updater.skip(reason)
+  g_logger.warning("Updater: update check skipped (" .. tostring(reason) .. ")")
+  removeEvent(scheduledEvent)
+  if updaterWindow then
+    Updater.abort()
+  end
 end
 
 function Updater.error(message)
