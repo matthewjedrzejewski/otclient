@@ -1125,14 +1125,17 @@ uint16_t Creature::getStepDuration(const bool ignoreDiagonal, const Otc::Directi
         m_stepCache.speed = m_speed;
         m_stepCache.groundSpeed = groundSpeed;
 
-        uint32_t stepDuration = 1000 * groundSpeed;
-        if (hasSpeedFormula()) {
-            stepDuration /= m_calculatedStepSpeed;
-        } else stepDuration /= m_speed;
+        const bool roundToBeat = g_gameConfig.isForcingNewWalkingFormula() || g_game.getClientVersion() >= 860;
+        const uint32_t stepSpeed = hasSpeedFormula() ? m_calculatedStepSpeed : m_speed;
 
-        if (g_gameConfig.isForcingNewWalkingFormula() || g_game.getClientVersion() >= 860) {
-            stepDuration = ((stepDuration + serverBeat - 1) / serverBeat) * serverBeat;
-        }
+        uint32_t stepDuration = 1000 * groundSpeed;
+        if (roundToBeat && serverBeat > 0) {
+            // OldLands: round the exact quotient up to the server beat, like the server does
+            // (ceil(1000 * ground / speed / beat) * beat). Flooring first gave a step 50 ms
+            // shorter than the server's whenever the quotient was just above a beat multiple.
+            const uint64_t divisor = static_cast<uint64_t>(stepSpeed) * serverBeat;
+            stepDuration = static_cast<uint32_t>(((static_cast<uint64_t>(stepDuration) + divisor - 1) / divisor) * serverBeat);
+        } else stepDuration /= stepSpeed;
 
         m_stepCache.duration = stepDuration;
 

@@ -530,7 +530,10 @@ void MapView::updateGeometry(const Size& visibleDimension)
     m_virtualCenterOffset = (drawDimension / 2 - Size(1)).toPoint();
     m_rectDimension = { 0, 0, bufferSize };
 
-    if (m_lightView->isEnabled()) {
+    // OldLands: always keep the light map in step with the map geometry. Resizing only while
+    // the light view was enabled left it on the old tile size after switching to Smooth Retro
+    // (64 px tiles) in daylight, so the first dark area drew the light in stripes.
+    {
         Size lightSize = g_map.getAwareRange().dimension();
         if (drawDimension > lightSize)
             lightSize = drawDimension;
