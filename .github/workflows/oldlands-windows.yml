@@ -1,7 +1,8 @@
 name: OldLands Windows client
 
 # Builds only the Windows OpenGL client (otclient_gl_x64.exe) of the OldLands branch.
-# The .exe is uploaded as the "oldlands-windows-opengl" artifact of the run.
+# The .exe (plus README_EXE.txt) is uploaded as the "oldlands-windows-opengl" artifact of the run.
+# The full client (init.lua, data, modules) is not in this repository; players get it from the website.
 
 on:
   workflow_dispatch:
@@ -66,8 +67,25 @@ jobs:
             /p:OutDir="$outDir\\" `
             /p:GITHUB_WORKSPACE="${{ github.workspace }}"
 
+      - name: Add install note
+        shell: pwsh
+        run: |
+          @"
+          OldLands client executable
+          ==========================
+          This zip holds only the program (otclient_gl_x64.exe).
+          It cannot start on its own: copy it into the OldLands client folder,
+          next to init.lua, data and modules, replacing the old exe.
+          Starting it from the zip or from Downloads gives
+          "Unable to find work directory".
+
+          Players do not need this file: they download the full client from the website.
+          "@ | Out-File -Encoding utf8 artifacts/OpenGL/README_EXE.txt
+
       - name: Upload the client
         uses: actions/upload-artifact@v7
         with:
           name: oldlands-windows-opengl
-          path: artifacts/OpenGL/*.exe
+          path: |
+            artifacts/OpenGL/*.exe
+            artifacts/OpenGL/README_EXE.txt

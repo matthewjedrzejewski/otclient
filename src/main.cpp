@@ -165,7 +165,9 @@ int main(const int argc, const char* argv[])
     // find script init.lua and run it
     ALOGD("main: discovering work dir...");
     if (!g_resources.discoverWorkDir("init.lua"))
-        g_logger.fatal("Unable to find work directory, the application cannot be initialized.");
+        g_logger.fatal("Unable to find work directory, the application cannot be initialized.\n\n"
+                       "OldLands: put this .exe into the OldLands client folder, next to init.lua, data and modules "
+                       "(do not start it from inside the zip or from the Downloads folder).");
     ALOGD("main: work dir found: %s", g_resources.getWorkDir().c_str());
 
     if (shouldShowHelp(args)) {
