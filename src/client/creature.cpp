@@ -1125,7 +1125,10 @@ uint16_t Creature::getStepDuration(const bool ignoreDiagonal, const Otc::Directi
         m_stepCache.speed = m_speed;
         m_stepCache.groundSpeed = groundSpeed;
 
-        const bool roundToBeat = g_gameConfig.isForcingNewWalkingFormula() || g_game.getClientVersion() >= 860;
+        // OldLands: the server always rounds steps to its beat and makes diagonals cost 3 steps.
+        // Do the same regardless of data/setup.otml, so a stale setup file can never make the
+        // client walk faster than the server (steps then got queued, dropped and snapped back).
+        const bool roundToBeat = true;
         const uint32_t stepSpeed = hasSpeedFormula() ? m_calculatedStepSpeed : m_speed;
 
         uint32_t stepDuration = 1000 * groundSpeed;
@@ -1142,9 +1145,7 @@ uint16_t Creature::getStepDuration(const bool ignoreDiagonal, const Otc::Directi
         m_stepCache.walkDuration = std::min<int>(stepDuration / g_gameConfig.getSpriteSize(), DrawPool::FPS60);
 
         m_stepCache.diagonalDuration = stepDuration *
-            (g_game.getClientVersion() > 810 || g_gameConfig.isForcingNewWalkingFormula()
-                ? (isPlayer() ? g_gameConfig.getPlayerDiagonalWalkSpeed() : g_gameConfig.getCreatureDiagonalWalkSpeed())
-                : 2);
+            (isPlayer() ? g_gameConfig.getPlayerDiagonalWalkSpeed() : g_gameConfig.getCreatureDiagonalWalkSpeed());
     }
 
     auto duration = ignoreDiagonal ? m_stepCache.duration : m_stepCache.getDuration(m_lastStepDirection);
