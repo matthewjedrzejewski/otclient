@@ -83,14 +83,14 @@ void Creature::draw(const Point& dest, const bool drawThings, LightView* /*light
 
     if (drawThings) {
         if (m_showTimedSquare) {
-            g_drawPool.addBoundingRect(Rect(dest + (m_walkOffset - getDisplacement() + 2) * g_drawPool.getScaleFactor(), Size(28 * g_drawPool.getScaleFactor())), m_timedSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
+            g_drawPool.addBoundingRect(Rect(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()) + (Point(2) - getDisplacement()) * g_drawPool.getScaleFactor(), Size(28 * g_drawPool.getScaleFactor())), m_timedSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
         }
 
         if (m_showStaticSquare) {
-            g_drawPool.addBoundingRect(Rect(dest + (m_walkOffset - getDisplacement()) * g_drawPool.getScaleFactor(), Size(g_gameConfig.getSpriteSize() * g_drawPool.getScaleFactor())), m_staticSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
+            g_drawPool.addBoundingRect(Rect(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()) - getDisplacement() * g_drawPool.getScaleFactor(), Size(g_gameConfig.getSpriteSize() * g_drawPool.getScaleFactor())), m_staticSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
         }
 
-        auto _dest = dest + m_walkOffset * g_drawPool.getScaleFactor();
+        auto _dest = dest + getScaledWalkOffset(g_drawPool.getScaleFactor());
 
         auto oldScaleFactor = g_drawPool.getScaleFactor();
 
@@ -127,10 +127,10 @@ void Creature::drawLight(const Point& dest, LightView* lightView) {
     }
 
     if (light.intensity > 0) {
-        lightView->addLightSource(dest + (m_walkOffset + (Point(g_gameConfig.getSpriteSize() / 2))) * g_drawPool.getScaleFactor(), light);
+        lightView->addLightSource(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()) + Point(g_gameConfig.getSpriteSize() / 2) * g_drawPool.getScaleFactor(), light);
     }
 
-    drawAttachedLightEffect(dest + m_walkOffset * g_drawPool.getScaleFactor(), lightView);
+    drawAttachedLightEffect(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()), lightView);
 
     for (const auto& paperdoll : m_paperdolls)
         paperdoll->drawLight(dest, m_outfit.hasMount(), lightView);
@@ -182,10 +182,10 @@ void Creature::drawInformation(const MapPosInfo& mapRect, const Point& dest, con
     const auto displacementY = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : getDisplacementY();
 
     const auto& parentRect = mapRect.rect;
-    const auto& creatureOffset = Point(16 - displacementX, -displacementY - 2) + getDrawOffset();
+    const auto& creatureOffset = Point(16 - displacementX, -displacementY - 2) + Point(-1, -1) * getDrawElevation();
 
     Point p = dest - mapRect.drawOffset;
-    p += (creatureOffset - Point(std::round(m_jumpOffset.x), std::round(m_jumpOffset.y))) * mapRect.scaleFactor;
+    p += (creatureOffset - Point(std::round(m_jumpOffset.x), std::round(m_jumpOffset.y))) * mapRect.scaleFactor + getScaledWalkOffset(mapRect.scaleFactor);
     p.x *= mapRect.horizontalStretchFactor;
     p.y *= mapRect.verticalStretchFactor;
     p += parentRect.topLeft();
@@ -523,6 +523,7 @@ void Creature::walk(const Position& oldPos, const Position& newPos)
     m_walking = true;
     m_walkTimer.restart();
     m_walkedPixels = 0;
+    m_walkedPixelsFine = 0.f;
 
     // no direction need to be changed when the walk ends
     m_walkTurnDirection = Otc::InvalidDirection;
@@ -802,18 +803,36 @@ void Creature::updateWalk()
 {
     const float walkTicksPerPixel = getStepDuration(true) / static_cast<float>(g_gameConfig.getSpriteSize());
 
-    const int totalPixelsWalked = std::min<int>(m_walkTimer.ticksElapsed() / walkTicksPerPixel, g_gameConfig.getSpriteSize());
+    const float spriteSize = g_gameConfig.getSpriteSize();
+    const float totalPixelsWalkedFine = std::min<float>(m_walkTimer.ticksElapsed() / walkTicksPerPixel, spriteSize);
+    const int totalPixelsWalked = static_cast<int>(totalPixelsWalkedFine);
 
     // needed for paralyze effect
     m_walkedPixels = std::max<int>(m_walkedPixels, totalPixelsWalked);
+    m_walkedPixelsFine = std::max<float>(m_walkedPixelsFine, totalPixelsWalkedFine);
 
-    const auto oldWalkOffset = m_walkOffset;
+    const auto oldWalkOffset = m_walkOffsetFine;
 
     updateWalkAnimation();
     updateWalkOffset(m_walkedPixels);
     updateWalkingTile();
 
-    if (isCameraFollowing() && oldWalkOffset != m_walkOffset) {
+    // OldLands (smooth camera): the same offset without rounding to whole sprite pixels
+    {
+        const float fine = m_walkedPixels >= g_gameConfig.getSpriteSize() ? spriteSize : m_walkedPixelsFine;
+        m_walkOffsetFine = {};
+        if (m_direction == Otc::North || m_direction == Otc::NorthEast || m_direction == Otc::NorthWest)
+            m_walkOffsetFine.y = spriteSize - fine;
+        else if (m_direction == Otc::South || m_direction == Otc::SouthEast || m_direction == Otc::SouthWest)
+            m_walkOffsetFine.y = fine - spriteSize;
+
+        if (m_direction == Otc::East || m_direction == Otc::NorthEast || m_direction == Otc::SouthEast)
+            m_walkOffsetFine.x = fine - spriteSize;
+        else if (m_direction == Otc::West || m_direction == Otc::NorthWest || m_direction == Otc::SouthWest)
+            m_walkOffsetFine.x = spriteSize - fine;
+    }
+
+    if (isCameraFollowing() && oldWalkOffset != m_walkOffsetFine) {
         g_map.notificateCameraMove(m_walkOffset);
     }
 
@@ -842,7 +861,9 @@ void Creature::terminateWalk()
     }
 
     m_walkedPixels = 0;
+    m_walkedPixelsFine = 0.f;
     m_walkOffset = {};
+    m_walkOffsetFine = {};
     m_walking = false;
 
     const auto self = static_self_cast<Creature>();
@@ -1142,7 +1163,8 @@ uint16_t Creature::getStepDuration(const bool ignoreDiagonal, const Otc::Directi
 
         m_stepCache.duration = stepDuration;
 
-        m_stepCache.walkDuration = std::min<int>(stepDuration / g_gameConfig.getSpriteSize(), DrawPool::FPS60);
+        // OldLands (smooth camera): other creatures move in fine steps too (4 updates per sprite pixel, at most one per ms)
+        m_stepCache.walkDuration = std::clamp<int>(stepDuration / (g_gameConfig.getSpriteSize() * 4), 1, DrawPool::FPS60);
 
         m_stepCache.diagonalDuration = stepDuration *
             (isPlayer() ? g_gameConfig.getPlayerDiagonalWalkSpeed() : g_gameConfig.getCreatureDiagonalWalkSpeed());

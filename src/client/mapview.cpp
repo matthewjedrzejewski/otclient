@@ -475,6 +475,16 @@ void MapView::updateRect(const Rect& rect) {
         requestUpdateMapPosInfo();
     }
 
+    // OldLands (smooth camera): pick the framebuffer scale from how big one tile is on the screen
+    if (rect.isValid() && m_visibleDimension.height() > 0) {
+        const float tileOnScreen = rect.height() / static_cast<float>(m_visibleDimension.height());
+        const auto fineScale = static_cast<uint8_t>(std::clamp<int>(std::ceil(tileOnScreen / g_gameConfig.getSpriteSize() - 0.01f), 1, 4));
+        if (fineScale != m_fineScale) {
+            m_fineScale = fineScale;
+            updateGeometry(m_visibleDimension);
+        }
+    }
+
     if (m_posInfo.rect != rect || m_updateMapPosInfo) {
         m_updateMapPosInfo = false;
 
@@ -498,6 +508,13 @@ void MapView::updateRect(const Rect& rect) {
 void MapView::updateGeometry(const Size& visibleDimension)
 {
     float scaleFactor = m_antiAliasingMode == Otc::ANTIALIASING_SMOOTH_RETRO ? 2.f : 1.f;
+
+    // OldLands (smooth camera): draw the map into a framebuffer whose pixels are not bigger than screen pixels
+    // (2x, 3x or 4x), so walking scrolls the map in steps of about one screen pixel instead of one sprite pixel
+    // (2-3 screen pixels, which looked like small jumps of the whole map).
+    scaleFactor = std::max<float>(scaleFactor, m_fineScale);
+    while (scaleFactor > 1.f && (visibleDimension + 3).width() * g_gameConfig.getSpriteSize() * scaleFactor > std::min<int>(g_graphics.getMaxTextureSize(), 4096))
+        scaleFactor -= 1.f;
 
     auto maxAwareRange = std::max<size_t>(visibleDimension.width(), visibleDimension.height());
 
@@ -853,7 +870,7 @@ Rect MapView::calcFramebufferSource(const Size& destSize)
 {
     Point drawOffset = ((m_drawDimension - m_visibleDimension - Size(1)).toPoint() / 2) * m_tileSize;
     if (isFollowingCreature())
-        drawOffset += m_followingCreature->getWalkOffset() * m_pool->getScaleFactor();
+        drawOffset += m_followingCreature->getScaledWalkOffset(m_pool->getScaleFactor());
     else if (!m_moveOffset.isNull())
         drawOffset += m_moveOffset * m_pool->getScaleFactor();
 

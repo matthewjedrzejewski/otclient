@@ -123,6 +123,12 @@ public:
     std::string getName() { return m_name.getText(); }
 
     Point getDrawOffset() { return Point(-1, -1) * getDrawElevation() + m_walkOffset; }
+    // OldLands (smooth camera): the walk offset with sub-sprite-pixel precision, already multiplied by the
+    // draw scale and rounded to whole framebuffer pixels. The camera and every creature use this same value,
+    // so the followed creature always stays exactly in the middle while the map scrolls in fine steps.
+    Point getScaledWalkOffset(const float scale) const {
+        return { static_cast<int>(std::lround(m_walkOffsetFine.x * scale)), static_cast<int>(std::lround(m_walkOffsetFine.y * scale)) };
+    }
     int getDrawElevation();
 
     Otc::Direction getDirection() { return m_direction; }
@@ -237,6 +243,7 @@ protected:
     bool m_walking{ false };
 
     Point m_walkOffset;
+    PointF m_walkOffsetFine; // OldLands: same as m_walkOffset, not rounded to sprite pixels
     Otc::Direction m_direction{ Otc::South };
 
     Timer m_walkTimer;
@@ -344,6 +351,7 @@ private:
     // walk related
     uint8_t m_walkAnimationPhase{ 0 };
     uint8_t m_walkedPixels{ 0 };
+    float m_walkedPixelsFine{ 0.f };
 
     uint8_t m_exactSize{ 0 };
 
