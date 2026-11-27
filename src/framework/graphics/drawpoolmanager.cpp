@@ -206,6 +206,12 @@ void DrawPoolManager::preDraw(const DrawPoolType type, const std::function<void(
         beforeRelease();
 
     if (pool->hasFrameBuffer()) {
+        // OldLands: the target rect is part of what this pool shows. Without it in the hash,
+        // resizing the map panel (e.g. dragging the console splitter) while nothing on the map
+        // changes kept drawing the map at its old size and place until the next map change.
+        pool->m_hashCtrl.put(dest.hash());
+        pool->m_hashCtrl.put(src.hash());
+
         addAction([pool, dest, src, colorClear] {
             pool->m_framebuffer->prepare(dest, src, colorClear);
         });

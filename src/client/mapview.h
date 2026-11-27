@@ -73,6 +73,7 @@ public:
 
     void setDrawNames(const bool enable) { m_drawNames = enable; }
     bool isDrawingNames() const { return m_drawNames; }
+    bool isDrawingViewportEdge() const { return m_drawViewportEdge; }
 
     void setDrawHealthBars(const bool enable) { m_drawHealthBars = enable; }
     bool isDrawingHealthBars() const { return m_drawHealthBars; }
@@ -280,6 +281,8 @@ private:
     FadeType m_fadeType{ FadeType::NONE };
 
     Otc::AntialiasingMode m_antiAliasingMode{ Otc::ANTIALIASING_DISABLED };
+    uint8_t m_fineScale{ 1 };
+    PainterShaderProgramPtr m_aaShader; // OldLands: soft "Antialiasing" look on the fine framebuffer // OldLands (smooth camera): framebuffer pixels per sprite pixel
 
     std::vector<FloorData> m_floors;
     std::vector<std::vector<FloorData>> m_floorThreads;

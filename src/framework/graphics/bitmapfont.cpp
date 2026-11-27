@@ -524,7 +524,15 @@ std::string BitmapFont::wrapText(std::string_view text, int maxWidth, const Wrap
             unsigned char ch = (unsigned char)*cur;
             if (_isSpace(ch)) {
                 const int w = glyphWidth(' ');
-                if (lineW + w > maxW) { commitBreak(false); pushChar(' '); lineW = w; ++cur; continue; }
+                if (lineW + w > maxW) {
+                    // OldLands: the word moved to the new line keeps its width. Before, the width
+                    // was reset here, so the next line could grow wider than the widget and got cut.
+                    const bool hadBreak = lastBreakOut >= 0;
+                    commitBreak(false);
+                    pushChar(' ');
+                    if (hadBreak) { lineW += w; markBreak(false, 0); } else lineW = w;
+                    ++cur; continue;
+                }
                 pushChar(' '); lineW += w; markBreak(false, 0); ++cur; continue;
             }
             if (_isHyphen(ch)) {

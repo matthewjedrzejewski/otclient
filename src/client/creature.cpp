@@ -83,14 +83,14 @@ void Creature::draw(const Point& dest, const bool drawThings, LightView* /*light
 
     if (drawThings) {
         if (m_showTimedSquare) {
-            g_drawPool.addBoundingRect(Rect(dest + (m_walkOffset - getDisplacement() + 2) * g_drawPool.getScaleFactor(), Size(28 * g_drawPool.getScaleFactor())), m_timedSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
+            g_drawPool.addBoundingRect(Rect(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()) + (Point(2) - getDisplacement()) * g_drawPool.getScaleFactor(), Size(28 * g_drawPool.getScaleFactor())), m_timedSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
         }
 
         if (m_showStaticSquare) {
-            g_drawPool.addBoundingRect(Rect(dest + (m_walkOffset - getDisplacement()) * g_drawPool.getScaleFactor(), Size(g_gameConfig.getSpriteSize() * g_drawPool.getScaleFactor())), m_staticSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
+            g_drawPool.addBoundingRect(Rect(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()) - getDisplacement() * g_drawPool.getScaleFactor(), Size(g_gameConfig.getSpriteSize() * g_drawPool.getScaleFactor())), m_staticSquareColor, std::max<int>(static_cast<int>(2 * g_drawPool.getScaleFactor()), 1));
         }
 
-        auto _dest = dest + m_walkOffset * g_drawPool.getScaleFactor();
+        auto _dest = dest + getScaledWalkOffset(g_drawPool.getScaleFactor());
 
         auto oldScaleFactor = g_drawPool.getScaleFactor();
 
@@ -127,10 +127,10 @@ void Creature::drawLight(const Point& dest, LightView* lightView) {
     }
 
     if (light.intensity > 0) {
-        lightView->addLightSource(dest + (m_walkOffset + (Point(g_gameConfig.getSpriteSize() / 2))) * g_drawPool.getScaleFactor(), light);
+        lightView->addLightSource(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()) + Point(g_gameConfig.getSpriteSize() / 2) * g_drawPool.getScaleFactor(), light);
     }
 
-    drawAttachedLightEffect(dest + m_walkOffset * g_drawPool.getScaleFactor(), lightView);
+    drawAttachedLightEffect(dest + getScaledWalkOffset(g_drawPool.getScaleFactor()), lightView);
 
     for (const auto& paperdoll : m_paperdolls)
         paperdoll->drawLight(dest, m_outfit.hasMount(), lightView);
@@ -182,10 +182,10 @@ void Creature::drawInformation(const MapPosInfo& mapRect, const Point& dest, con
     const auto displacementY = g_game.getFeature(Otc::GameNegativeOffset) ? 0 : getDisplacementY();
 
     const auto& parentRect = mapRect.rect;
-    const auto& creatureOffset = Point(16 - displacementX, -displacementY - 2) + getDrawOffset();
+    const auto& creatureOffset = Point(16 - displacementX, -displacementY - 2) + Point(-1, -1) * getDrawElevation();
 
     Point p = dest - mapRect.drawOffset;
-    p += (creatureOffset - Point(std::round(m_jumpOffset.x), std::round(m_jumpOffset.y))) * mapRect.scaleFactor;
+    p += (creatureOffset - Point(std::round(m_jumpOffset.x), std::round(m_jumpOffset.y))) * mapRect.scaleFactor + getScaledWalkOffset(mapRect.scaleFactor);
     p.x *= mapRect.horizontalStretchFactor;
     p.y *= mapRect.verticalStretchFactor;
     p += parentRect.topLeft();
@@ -401,8 +401,8 @@ void Creature::internalDraw(Point dest, const Color& color)
 
         // outfit is a real creature
         if (m_outfit.isCreature()) {
-            if (m_outfit.hasMount()) {
-                dest -= getMountThingType()->getDisplacement() * g_drawPool.getScaleFactor();
+            if (const auto mountType = getMountThingType(); mountType) {
+                dest -= mountType->getDisplacement() * g_drawPool.getScaleFactor();
 
                 if (!replaceColorShader && hasMountShader()) {
                     g_drawPool.setShaderProgram(g_shaders.getShaderById(m_mountShaderId), true/*, [this]()-> void {
@@ -410,7 +410,7 @@ void Creature::internalDraw(Point dest, const Color& color)
                         m_mountShader->setUniformValue(ShaderManager::MOUNT_ID_UNIFORM, m_outfit.getMount());
                     }*/);
                 }
-                getMountThingType()->draw(dest, 0, m_numPatternX, 0, 0, getCurrentAnimationPhase(true), color);
+                mountType->draw(dest, 0, m_numPatternX, 0, 0, getCurrentAnimationPhase(true), color);
 
                 dest += getDisplacement() * g_drawPool.getScaleFactor();
             }
@@ -523,6 +523,7 @@ void Creature::walk(const Position& oldPos, const Position& newPos)
     m_walking = true;
     m_walkTimer.restart();
     m_walkedPixels = 0;
+    m_walkedPixelsFine = 0.f;
 
     // no direction need to be changed when the walk ends
     m_walkTurnDirection = Otc::InvalidDirection;
@@ -680,7 +681,8 @@ void Creature::updateWalkAnimation()
     if (!m_outfit.isCreature())
         return;
 
-    int footAnimPhases = m_outfit.hasMount() ? getMountThingType()->getAnimationPhases() : getAnimationPhases();
+    const auto mountType = getMountThingType();
+    int footAnimPhases = mountType ? mountType->getAnimationPhases() : getAnimationPhases();
     if (!g_game.getFeature(Otc::GameEnhancedAnimations) && footAnimPhases > 2) {
         --footAnimPhases;
     }
@@ -801,18 +803,36 @@ void Creature::updateWalk()
 {
     const float walkTicksPerPixel = getStepDuration(true) / static_cast<float>(g_gameConfig.getSpriteSize());
 
-    const int totalPixelsWalked = std::min<int>(m_walkTimer.ticksElapsed() / walkTicksPerPixel, g_gameConfig.getSpriteSize());
+    const float spriteSize = g_gameConfig.getSpriteSize();
+    const float totalPixelsWalkedFine = std::min<float>(m_walkTimer.ticksElapsed() / walkTicksPerPixel, spriteSize);
+    const int totalPixelsWalked = static_cast<int>(totalPixelsWalkedFine);
 
     // needed for paralyze effect
     m_walkedPixels = std::max<int>(m_walkedPixels, totalPixelsWalked);
+    m_walkedPixelsFine = std::max<float>(m_walkedPixelsFine, totalPixelsWalkedFine);
 
-    const auto oldWalkOffset = m_walkOffset;
+    const auto oldWalkOffset = m_walkOffsetFine;
 
     updateWalkAnimation();
     updateWalkOffset(m_walkedPixels);
     updateWalkingTile();
 
-    if (isCameraFollowing() && oldWalkOffset != m_walkOffset) {
+    // OldLands (smooth camera): the same offset without rounding to whole sprite pixels
+    {
+        const float fine = m_walkedPixels >= g_gameConfig.getSpriteSize() ? spriteSize : m_walkedPixelsFine;
+        m_walkOffsetFine = {};
+        if (m_direction == Otc::North || m_direction == Otc::NorthEast || m_direction == Otc::NorthWest)
+            m_walkOffsetFine.y = spriteSize - fine;
+        else if (m_direction == Otc::South || m_direction == Otc::SouthEast || m_direction == Otc::SouthWest)
+            m_walkOffsetFine.y = fine - spriteSize;
+
+        if (m_direction == Otc::East || m_direction == Otc::NorthEast || m_direction == Otc::SouthEast)
+            m_walkOffsetFine.x = fine - spriteSize;
+        else if (m_direction == Otc::West || m_direction == Otc::NorthWest || m_direction == Otc::SouthWest)
+            m_walkOffsetFine.x = spriteSize - fine;
+    }
+
+    if (isCameraFollowing() && oldWalkOffset != m_walkOffsetFine) {
         g_map.notificateCameraMove(m_walkOffset);
     }
 
@@ -841,7 +861,9 @@ void Creature::terminateWalk()
     }
 
     m_walkedPixels = 0;
+    m_walkedPixelsFine = 0.f;
     m_walkOffset = {};
+    m_walkOffsetFine = {};
     m_walking = false;
 
     const auto self = static_self_cast<Creature>();
@@ -1124,23 +1146,28 @@ uint16_t Creature::getStepDuration(const bool ignoreDiagonal, const Otc::Directi
         m_stepCache.speed = m_speed;
         m_stepCache.groundSpeed = groundSpeed;
 
-        uint32_t stepDuration = 1000 * groundSpeed;
-        if (hasSpeedFormula()) {
-            stepDuration /= m_calculatedStepSpeed;
-        } else stepDuration /= m_speed;
+        // OldLands: the server always rounds steps to its beat and makes diagonals cost 3 steps.
+        // Do the same regardless of data/setup.otml, so a stale setup file can never make the
+        // client walk faster than the server (steps then got queued, dropped and snapped back).
+        const bool roundToBeat = true;
+        const uint32_t stepSpeed = hasSpeedFormula() ? m_calculatedStepSpeed : m_speed;
 
-        if (g_gameConfig.isForcingNewWalkingFormula() || g_game.getClientVersion() >= 860) {
-            stepDuration = ((stepDuration + serverBeat - 1) / serverBeat) * serverBeat;
-        }
+        uint32_t stepDuration = 1000 * groundSpeed;
+        if (roundToBeat && serverBeat > 0) {
+            // OldLands: round the exact quotient up to the server beat, like the server does
+            // (ceil(1000 * ground / speed / beat) * beat). Flooring first gave a step 50 ms
+            // shorter than the server's whenever the quotient was just above a beat multiple.
+            const uint64_t divisor = static_cast<uint64_t>(stepSpeed) * serverBeat;
+            stepDuration = static_cast<uint32_t>(((static_cast<uint64_t>(stepDuration) + divisor - 1) / divisor) * serverBeat);
+        } else stepDuration /= stepSpeed;
 
         m_stepCache.duration = stepDuration;
 
-        m_stepCache.walkDuration = std::min<int>(stepDuration / g_gameConfig.getSpriteSize(), DrawPool::FPS60);
+        // OldLands (smooth camera): other creatures move in fine steps too (4 updates per sprite pixel, at most one per ms)
+        m_stepCache.walkDuration = std::clamp<int>(stepDuration / (g_gameConfig.getSpriteSize() * 4), 1, DrawPool::FPS60);
 
         m_stepCache.diagonalDuration = stepDuration *
-            (g_game.getClientVersion() > 810 || g_gameConfig.isForcingNewWalkingFormula()
-                ? (isPlayer() ? g_gameConfig.getPlayerDiagonalWalkSpeed() : g_gameConfig.getCreatureDiagonalWalkSpeed())
-                : 2);
+            (isPlayer() ? g_gameConfig.getPlayerDiagonalWalkSpeed() : g_gameConfig.getCreatureDiagonalWalkSpeed());
     }
 
     auto duration = ignoreDiagonal ? m_stepCache.duration : m_stepCache.getDuration(m_lastStepDirection);
@@ -1172,8 +1199,8 @@ int Creature::getDisplacementX() const
     if (m_outfit.isItem())
         return 0;
 
-    if (m_outfit.hasMount())
-        return getMountThingType()->getDisplacementX();
+    if (const auto mountType = getMountThingType(); mountType)
+        return mountType->getDisplacementX();
 
     return Thing::getDisplacementX();
 }
@@ -1186,8 +1213,8 @@ int Creature::getDisplacementY() const
     if (m_outfit.isItem())
         return 0;
 
-    if (m_outfit.hasMount())
-        return getMountThingType()->getDisplacementY();
+    if (const auto mountType = getMountThingType(); mountType)
+        return mountType->getDisplacementY();
 
     return Thing::getDisplacementY();
 }

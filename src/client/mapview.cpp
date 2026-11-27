@@ -77,6 +77,21 @@ void MapView::registerEvents() {
             if (m_shaderSwitchDone && m_shader && m_fadeInTime > 0)
                 fadeOpacity = std::min<float>(m_fadeTimer.timeElapsed() / m_fadeInTime, 1.f);
 
+            // OldLands: the map is drawn at 2x-4x for the smooth camera, so the "Antialiasing" and "Smooth Retro"
+            // modes lost their look (they stretched a 1x / 2x picture with linear filtering). Averaging the
+            // framebuffer pixels that made one pixel of that old picture gives the same picture again.
+            // Antialiasing used a 1x picture, Smooth Retro a 2x picture: blur width = one pixel of that old picture.
+            const float fbScale = m_pool->getScaleFactor();
+            const float blurWidth = m_antiAliasingMode == Otc::ANTIALIASING_ENABLED ? fbScale :
+                m_antiAliasingMode == Otc::ANTIALIASING_SMOOTH_RETRO ? fbScale / 2.f : 1.f;
+            if (!m_shader && m_aaShader && blurWidth > 1.01f) {
+                const auto& fbSize = m_pool->getFrameBuffer()->getSize();
+                m_aaShader->bind();
+                m_aaShader->setUniformValue(ShaderManager::MAP_ZOOM, blurWidth);
+                m_aaShader->setUniformValue(ShaderManager::MAP_WALKOFFSET, 1.f / fbSize.width(), 1.f / fbSize.height());
+                g_painter->setShaderProgram(m_aaShader);
+            }
+
             if (m_shader) {
                 const auto& center = srcRect.center();
                 const auto& globalCoord = Point(camera.x - m_drawDimension.width() / 2, -(camera.y - m_drawDimension.height() / 2)) * m_tileSize;
@@ -141,7 +156,7 @@ void MapView::drawFloor()
         const bool alwaysTransparent = m_floorViewMode == Otc::ALWAYS_WITH_TRANSPARENCY && z < m_cachedFirstVisibleFloor && _camera.coveredUp(cameraPosition.z - z);
 
         const auto& map = m_floors[z].cachedVisibleTiles;
-        std::vector<TilePtr> walking_tiles;
+        std::vector<std::pair<TilePtr, uint32_t>> walking_tiles;
 
         for (const auto& tile : map.tiles) {
             uint32_t tileFlags = flags;
@@ -149,14 +164,14 @@ void MapView::drawFloor()
             if (!m_drawViewportEdge && !tile->canRender(tileFlags, cameraPosition, m_viewport))
                 continue;
 
-            walking_tiles.emplace_back(tile);
+            walking_tiles.emplace_back(tile, tileFlags);
 
             // if this tile is the edge or if upper right tile doesn't have walking creatures
             // -> draw it and all walking_tiles depending on it (if there are any queued up)
             TilePtr upper_right_tile = g_map.getTile(tile->getPosition().translated(1, -1, 0));
             if (!upper_right_tile || !upper_right_tile->hasWalkingCreature()) {
                 for (int i = walking_tiles.size() - 1; i >= 0; i--) {
-                    auto const &tile = walking_tiles[i];
+                    const auto& [tile, tileFlags] = walking_tiles[i];
 
                     if (alwaysTransparent) {
                         const bool inRange = tile->getPosition().isInRange(_camera, g_gameConfig.getTileTransparentFloorViewRange(), g_gameConfig.getTileTransparentFloorViewRange(), true);
@@ -170,6 +185,23 @@ void MapView::drawFloor()
                 }
                 walking_tiles.clear();
             }
+        }
+
+        if (!walking_tiles.empty()) {
+            for (int i = walking_tiles.size() - 1; i >= 0; i--) {
+                const auto& [tile, tileFlags] = walking_tiles[i];
+
+                if (alwaysTransparent) {
+                    const bool inRange = tile->getPosition().isInRange(_camera, g_gameConfig.getTileTransparentFloorViewRange(), g_gameConfig.getTileTransparentFloorViewRange(), true);
+                    g_drawPool.setOpacity(inRange ? .16 : .7);
+                }
+
+                tile->draw(m_posInfo, transformPositionTo2D(tile->getPosition()), tileFlags);
+
+                if (alwaysTransparent)
+                    g_drawPool.resetOpacity();
+            }
+            walking_tiles.clear();
         }
 
         for (const auto& missile : g_map.getFloorMissiles(z))
@@ -458,6 +490,16 @@ void MapView::updateRect(const Rect& rect) {
         requestUpdateMapPosInfo();
     }
 
+    // OldLands (smooth camera): pick the framebuffer scale from how big one tile is on the screen
+    if (rect.isValid() && m_visibleDimension.height() > 0) {
+        const float tileOnScreen = rect.height() / static_cast<float>(m_visibleDimension.height());
+        const auto fineScale = static_cast<uint8_t>(std::clamp<int>(std::ceil(tileOnScreen / g_gameConfig.getSpriteSize() - 0.01f), 1, 4));
+        if (fineScale != m_fineScale) {
+            m_fineScale = fineScale;
+            updateGeometry(m_visibleDimension);
+        }
+    }
+
     if (m_posInfo.rect != rect || m_updateMapPosInfo) {
         m_updateMapPosInfo = false;
 
@@ -481,6 +523,13 @@ void MapView::updateRect(const Rect& rect) {
 void MapView::updateGeometry(const Size& visibleDimension)
 {
     float scaleFactor = m_antiAliasingMode == Otc::ANTIALIASING_SMOOTH_RETRO ? 2.f : 1.f;
+
+    // OldLands (smooth camera): draw the map into a framebuffer whose pixels are not bigger than screen pixels
+    // (2x, 3x or 4x), so walking scrolls the map in steps of about one screen pixel instead of one sprite pixel
+    // (2-3 screen pixels, which looked like small jumps of the whole map).
+    scaleFactor = std::max<float>(scaleFactor, m_fineScale);
+    while (scaleFactor > 1.f && (visibleDimension + 3).width() * g_gameConfig.getSpriteSize() * scaleFactor > std::min<int>(g_graphics.getMaxTextureSize(), 4096))
+        scaleFactor -= 1.f;
 
     auto maxAwareRange = std::max<size_t>(visibleDimension.width(), visibleDimension.height());
 
@@ -513,7 +562,10 @@ void MapView::updateGeometry(const Size& visibleDimension)
     m_virtualCenterOffset = (drawDimension / 2 - Size(1)).toPoint();
     m_rectDimension = { 0, 0, bufferSize };
 
-    if (m_lightView->isEnabled()) {
+    // OldLands: always keep the light map in step with the map geometry. Resizing only while
+    // the light view was enabled left it on the old tile size after switching to Smooth Retro
+    // (64 px tiles) in daylight, so the first dark area drew the light in stripes.
+    {
         Size lightSize = g_map.getAwareRange().dimension();
         if (drawDimension > lightSize)
             lightSize = drawDimension;
@@ -731,6 +783,39 @@ void MapView::setAntiAliasingMode(const Otc::AntialiasingMode mode)
         m_pool->getFrameBuffer()->setSmooth(mode != Otc::ANTIALIASING_DISABLED);
     });
 
+    if (mode != Otc::ANTIALIASING_DISABLED && !m_aaShader) {
+        static constexpr std::string_view aaFragment = R"(
+            uniform sampler2D u_Tex0;
+            uniform float u_MapZoom;
+            uniform vec2 u_WalkOffset; // size of one framebuffer pixel
+            uniform float u_Opacity;
+            varying vec2 v_TexCoord;
+            void main()
+            {
+                // u_MapZoom = width of the blur in framebuffer pixels. Every linear sample already covers
+                // one pixel; n samples with this spacing blur as much as a box of the wanted width
+                // (exact for whole widths, same variance for 1.5).
+                float n = ceil(u_MapZoom - 0.001);
+                float spread = n > 1.5 ? sqrt((u_MapZoom * u_MapZoom - 1.0) / (n * n - 1.0)) : 0.0;
+                vec4 sum = vec4(0.0);
+                for (int i = 0; i < 4; ++i) {
+                    for (int j = 0; j < 4; ++j) {
+                        vec2 k = vec2(float(i), float(j));
+                        if (k.x < n && k.y < n)
+                            sum += texture2D(u_Tex0, v_TexCoord + (k - vec2((n - 1.0) * 0.5)) * spread * u_WalkOffset);
+                    }
+                }
+                gl_FragColor = sum / (n * n);
+                gl_FragColor.a *= u_Opacity;
+            }
+        )";
+        if (!g_shaders.getShader("oldlands_antialiasing")) {
+            g_shaders.createFragmentShaderFromCode("oldlands_antialiasing", aaFragment);
+            g_shaders.setupMapShader("oldlands_antialiasing");
+        }
+        g_mainDispatcher.addEvent([this] { m_aaShader = g_shaders.getShader("oldlands_antialiasing"); });
+    }
+
     updateGeometry(m_visibleDimension);
 }
 
@@ -833,7 +918,7 @@ Rect MapView::calcFramebufferSource(const Size& destSize)
 {
     Point drawOffset = ((m_drawDimension - m_visibleDimension - Size(1)).toPoint() / 2) * m_tileSize;
     if (isFollowingCreature())
-        drawOffset += m_followingCreature->getWalkOffset() * m_pool->getScaleFactor();
+        drawOffset += m_followingCreature->getScaledWalkOffset(m_pool->getScaleFactor());
     else if (!m_moveOffset.isNull())
         drawOffset += m_moveOffset * m_pool->getScaleFactor();
 
@@ -990,44 +1075,15 @@ void MapView::setDrawLights(const bool enable)
 
 void MapView::updateViewportDirectionCache()
 {
+    const auto halfWidth = static_cast<uint8_t>(std::min<int>(m_drawDimension.width() / 2, 254));
+    const auto halfHeight = static_cast<uint8_t>(std::min<int>(m_drawDimension.height() / 2, 254));
+
     for (uint8_t dir = Otc::North; dir <= Otc::InvalidDirection; ++dir) {
         auto& vp = m_viewPortDirection[dir];
-        vp.top = m_posInfo.awareRange.top;
-        vp.right = m_posInfo.awareRange.right;
-        vp.bottom = vp.top;
-        vp.left = vp.right;
-
-        switch (dir) {
-            case Otc::North:
-            case Otc::South:
-                vp.top += 1;
-                vp.bottom += 1;
-                break;
-
-            case Otc::West:
-            case Otc::East:
-                vp.right += 1;
-                vp.left += 1;
-                break;
-
-            case Otc::NorthEast:
-            case Otc::SouthEast:
-            case Otc::NorthWest:
-            case Otc::SouthWest:
-                vp.left += 1;
-                vp.bottom += 1;
-                vp.top += 1;
-                vp.right += 1;
-                break;
-
-            case Otc::InvalidDirection:
-                vp.left -= 1;
-                vp.right -= 1;
-                break;
-
-            default:
-                break;
-        }
+        vp.left = halfWidth;
+        vp.top = halfHeight;
+        vp.right = static_cast<uint8_t>(halfWidth + 1);
+        vp.bottom = static_cast<uint8_t>(halfHeight + 1);
     }
 }
 

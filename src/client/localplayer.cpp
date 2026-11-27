@@ -165,8 +165,11 @@ void LocalPlayer::cancelWalk(const Otc::Direction direction)
     callLuaField("onCancelWalk", direction);
 }
 
-bool LocalPlayer::autoWalk(const Position& destination, const bool retry)
+bool LocalPlayer::autoWalk(const Position& dest, const bool retry)
 {
+    // copy: the caller may pass m_autoWalkDestination itself, which is reset below
+    const Position destination = dest;
+
     // reset state
     m_autoWalkDestination = {};
     m_lastAutoWalkPosition = {};
@@ -205,8 +208,11 @@ bool LocalPlayer::autoWalk(const Position& destination, const bool retry)
             return;
         }
 
-        if (self->m_autoWalkDestination != result->destination) {
-            self->m_lastAutoWalkPosition = result->destination;
+        // the path may end before the destination (unexplored minimap area or
+        // more than 127 steps): remember where it ends to continue from there
+        const auto& finalAutoWalkPos = self->m_position.translatedToDirections(result->path).back();
+        if (self->m_autoWalkDestination != finalAutoWalkPos) {
+            self->m_lastAutoWalkPosition = finalAutoWalkPos;
         }
 
         g_game.autoWalk(result->path, result->start);

@@ -185,8 +185,10 @@ void Tile::drawCreature(const MapPosInfo& mapRect, const Point& dest, const int 
 
     g_drawPool.setDrawOrder(DrawOrder::THIRD);
     for (const auto& creature : m_walkingCreatures) {
-        // already drawn by this point
-        if (creature->getDirection() == Otc::Direction::NorthEast || creature->getDirection() == Otc::Direction::SouthWest)
+        // already drawn by this point (Tile::draw draws NE/SW walkers early for the draw order).
+        // OldLands: Tile::drawLight has no such early pass, so the light of a creature walking
+        // NE/SW must still be added here, otherwise its light vanished for the whole diagonal step.
+        if (flags != Otc::DrawLights && (creature->getDirection() == Otc::Direction::NorthEast || creature->getDirection() == Otc::Direction::SouthWest))
             if (creature->getLastStepToPosition() != getPosition())
                 continue;
 

@@ -108,6 +108,16 @@ std::string buildStartupTimestamp()
 
 } // namespace
 
+#ifdef _WIN32
+// OldLands: on laptops with two graphics cards (Intel/AMD built-in + NVIDIA/AMD dedicated) ask the
+// drivers to run the client on the dedicated card. Without these exports Windows usually picks the
+// weaker built-in GPU for an unknown .exe, which gives low FPS and stutter in crowded places.
+extern "C" {
+    __declspec(dllexport) unsigned long NvOptimusEnablement = 0x00000001;
+    __declspec(dllexport) int AmdPowerXpressRequestHighPerformance = 1;
+}
+#endif
+
 int main(const int argc, const char* argv[])
 {
     std::vector<std::string> args(argv, argv + argc);
@@ -155,7 +165,9 @@ int main(const int argc, const char* argv[])
     // find script init.lua and run it
     ALOGD("main: discovering work dir...");
     if (!g_resources.discoverWorkDir("init.lua"))
-        g_logger.fatal("Unable to find work directory, the application cannot be initialized.");
+        g_logger.fatal("Unable to find work directory, the application cannot be initialized.\n\n"
+                       "OldLands: put this .exe into the OldLands client folder, next to init.lua, data and modules "
+                       "(do not start it from inside the zip or from the Downloads folder).");
     ALOGD("main: work dir found: %s", g_resources.getWorkDir().c_str());
 
     if (shouldShowHelp(args)) {
