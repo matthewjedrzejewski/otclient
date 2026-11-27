@@ -281,7 +281,8 @@ private:
     FadeType m_fadeType{ FadeType::NONE };
 
     Otc::AntialiasingMode m_antiAliasingMode{ Otc::ANTIALIASING_DISABLED };
-    uint8_t m_fineScale{ 1 }; // OldLands (smooth camera): framebuffer pixels per sprite pixel
+    uint8_t m_fineScale{ 1 };
+    PainterShaderProgramPtr m_aaShader; // OldLands: soft "Antialiasing" look on the fine framebuffer // OldLands (smooth camera): framebuffer pixels per sprite pixel
 
     std::vector<FloorData> m_floors;
     std::vector<std::vector<FloorData>> m_floorThreads;

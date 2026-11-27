@@ -77,6 +77,17 @@ void MapView::registerEvents() {
             if (m_shaderSwitchDone && m_shader && m_fadeInTime > 0)
                 fadeOpacity = std::min<float>(m_fadeTimer.timeElapsed() / m_fadeInTime, 1.f);
 
+            // OldLands: the map is drawn at 2x-4x for the smooth camera, so the "Antialiasing" mode lost its soft
+            // look (it used to stretch a 1x picture with linear filtering). Averaging NxN framebuffer pixels
+            // gives exactly that old picture again, now with the sub-pixel camera.
+            if (!m_shader && m_aaShader && m_antiAliasingMode == Otc::ANTIALIASING_ENABLED && m_pool->getScaleFactor() > 1.f) {
+                const auto& fbSize = m_pool->getFrameBuffer()->getSize();
+                m_aaShader->bind();
+                m_aaShader->setUniformValue(ShaderManager::MAP_ZOOM, m_pool->getScaleFactor());
+                m_aaShader->setUniformValue(ShaderManager::MAP_WALKOFFSET, 1.f / fbSize.width(), 1.f / fbSize.height());
+                g_painter->setShaderProgram(m_aaShader);
+            }
+
             if (m_shader) {
                 const auto& center = srcRect.center();
                 const auto& globalCoord = Point(camera.x - m_drawDimension.width() / 2, -(camera.y - m_drawDimension.height() / 2)) * m_tileSize;
@@ -767,6 +778,35 @@ void MapView::setAntiAliasingMode(const Otc::AntialiasingMode mode)
     g_mainDispatcher.addEvent([=, this] {
         m_pool->getFrameBuffer()->setSmooth(mode != Otc::ANTIALIASING_DISABLED);
     });
+
+    if (mode == Otc::ANTIALIASING_ENABLED && !m_aaShader) {
+        static constexpr std::string_view aaFragment = R"(
+            uniform sampler2D u_Tex0;
+            uniform float u_MapZoom;
+            uniform vec2 u_WalkOffset; // size of one framebuffer pixel
+            uniform float u_Opacity;
+            varying vec2 v_TexCoord;
+            void main()
+            {
+                float n = floor(u_MapZoom + 0.5);
+                vec4 sum = vec4(0.0);
+                for (int i = 0; i < 4; ++i) {
+                    for (int j = 0; j < 4; ++j) {
+                        vec2 k = vec2(float(i), float(j));
+                        if (k.x < n && k.y < n)
+                            sum += texture2D(u_Tex0, v_TexCoord + (k - vec2((n - 1.0) * 0.5)) * u_WalkOffset);
+                    }
+                }
+                gl_FragColor = sum / (n * n);
+                gl_FragColor.a *= u_Opacity;
+            }
+        )";
+        if (!g_shaders.getShader("oldlands_antialiasing")) {
+            g_shaders.createFragmentShaderFromCode("oldlands_antialiasing", aaFragment);
+            g_shaders.setupMapShader("oldlands_antialiasing");
+        }
+        g_mainDispatcher.addEvent([this] { m_aaShader = g_shaders.getShader("oldlands_antialiasing"); });
+    }
 
     updateGeometry(m_visibleDimension);
 }
