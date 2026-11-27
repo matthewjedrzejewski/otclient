@@ -77,13 +77,17 @@ void MapView::registerEvents() {
             if (m_shaderSwitchDone && m_shader && m_fadeInTime > 0)
                 fadeOpacity = std::min<float>(m_fadeTimer.timeElapsed() / m_fadeInTime, 1.f);
 
-            // OldLands: the map is drawn at 2x-4x for the smooth camera, so the "Antialiasing" mode lost its soft
-            // look (it used to stretch a 1x picture with linear filtering). Averaging NxN framebuffer pixels
-            // gives exactly that old picture again, now with the sub-pixel camera.
-            if (!m_shader && m_aaShader && m_antiAliasingMode == Otc::ANTIALIASING_ENABLED && m_pool->getScaleFactor() > 1.f) {
+            // OldLands: the map is drawn at 2x-4x for the smooth camera, so the "Antialiasing" and "Smooth Retro"
+            // modes lost their look (they stretched a 1x / 2x picture with linear filtering). Averaging the
+            // framebuffer pixels that made one pixel of that old picture gives the same picture again.
+            // Antialiasing used a 1x picture, Smooth Retro a 2x picture: blur width = one pixel of that old picture.
+            const float fbScale = m_pool->getScaleFactor();
+            const float blurWidth = m_antiAliasingMode == Otc::ANTIALIASING_ENABLED ? fbScale :
+                m_antiAliasingMode == Otc::ANTIALIASING_SMOOTH_RETRO ? fbScale / 2.f : 1.f;
+            if (!m_shader && m_aaShader && blurWidth > 1.01f) {
                 const auto& fbSize = m_pool->getFrameBuffer()->getSize();
                 m_aaShader->bind();
-                m_aaShader->setUniformValue(ShaderManager::MAP_ZOOM, m_pool->getScaleFactor());
+                m_aaShader->setUniformValue(ShaderManager::MAP_ZOOM, blurWidth);
                 m_aaShader->setUniformValue(ShaderManager::MAP_WALKOFFSET, 1.f / fbSize.width(), 1.f / fbSize.height());
                 g_painter->setShaderProgram(m_aaShader);
             }
@@ -779,7 +783,7 @@ void MapView::setAntiAliasingMode(const Otc::AntialiasingMode mode)
         m_pool->getFrameBuffer()->setSmooth(mode != Otc::ANTIALIASING_DISABLED);
     });
 
-    if (mode == Otc::ANTIALIASING_ENABLED && !m_aaShader) {
+    if (mode != Otc::ANTIALIASING_DISABLED && !m_aaShader) {
         static constexpr std::string_view aaFragment = R"(
             uniform sampler2D u_Tex0;
             uniform float u_MapZoom;
@@ -788,13 +792,17 @@ void MapView::setAntiAliasingMode(const Otc::AntialiasingMode mode)
             varying vec2 v_TexCoord;
             void main()
             {
-                float n = floor(u_MapZoom + 0.5);
+                // u_MapZoom = width of the blur in framebuffer pixels. Every linear sample already covers
+                // one pixel; n samples with this spacing blur as much as a box of the wanted width
+                // (exact for whole widths, same variance for 1.5).
+                float n = ceil(u_MapZoom - 0.001);
+                float spread = n > 1.5 ? sqrt((u_MapZoom * u_MapZoom - 1.0) / (n * n - 1.0)) : 0.0;
                 vec4 sum = vec4(0.0);
                 for (int i = 0; i < 4; ++i) {
                     for (int j = 0; j < 4; ++j) {
                         vec2 k = vec2(float(i), float(j));
                         if (k.x < n && k.y < n)
-                            sum += texture2D(u_Tex0, v_TexCoord + (k - vec2((n - 1.0) * 0.5)) * u_WalkOffset);
+                            sum += texture2D(u_Tex0, v_TexCoord + (k - vec2((n - 1.0) * 0.5)) * spread * u_WalkOffset);
                     }
                 }
                 gl_FragColor = sum / (n * n);
